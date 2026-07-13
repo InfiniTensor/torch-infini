@@ -40,8 +40,10 @@ pip install --no-build-isolation --no-deps .
 `INFINI_RT_RUNTIME_LIBRARY_DIRS` can be used when the headers or library are not
 under a single install prefix.
 
-Set `CUDA_INCLUDE_DIRS` if an installed InfiniRT backend header depends on CUDA
-headers outside the standard toolkit paths.
+Some InfiniRT installations currently expose CUDA headers through their public
+headers. For those installations, set `CUDA_INCLUDE_DIRS` when CUDA headers are
+outside the standard toolkit paths. `torch-infini` does not otherwise depend on
+CUDA; InfiniRT should eventually export any required transitive include paths.
 
 ## Scope
 

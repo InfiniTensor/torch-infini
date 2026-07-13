@@ -13,6 +13,8 @@ def _split_paths(value):
 
 
 def _cuda_include_dirs():
+    # Some InfiniRT installations expose CUDA headers from their public API.
+    # Keep this transitive dependency isolated until InfiniRT exports it.
     include_dirs = []
     include_dirs.extend(_split_paths(os.environ.get("CUDA_INCLUDE_DIRS", "")))
 
