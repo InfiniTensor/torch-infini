@@ -9,8 +9,13 @@ device through PyTorch's `PrivateUse1` backend slot:
 import torch
 import torch_infini
 
-x = torch.empty((4, 4), device="infini:0")
-torch.infini.synchronize()
+src = torch.arange(16, dtype=torch.float32).reshape(4, 4)
+x = torch.empty(src.shape, dtype=src.dtype, device="infini:0")
+x.copy_(src)
+
+out = torch.empty_like(src)
+out.copy_(x)
+torch.testing.assert_close(out, src)
 ```
 
 This first-step bridge is intentionally narrow. It wires PyTorch device
@@ -40,7 +45,7 @@ headers outside the standard toolkit paths.
 
 ## Scope
 
-The current MVP supports:
+The initial implementation supports:
 
 - `device="infini:0"`
 - `torch.infini.is_available()`
@@ -52,5 +57,7 @@ The current MVP supports:
 - `torch.empty_strided(..., device="infini")`
 - contiguous `copy_` between CPU and Infini tensors
 
-Unsupported ATen operators should fail clearly instead of silently falling back
-through CPU.
+The `torch.infini` module follows `torch.cuda` naming and semantics for the
+device-management operations it implements. Stream, event, random-number, and
+general ATen operator support are not exposed yet. Unsupported operations should
+fail clearly instead of silently falling back through CPU.
