@@ -1,7 +1,7 @@
 #include <c10/core/Allocator.h>
 #include <c10/core/Device.h>
 
-#include "infini_torch.h"
+#include "torch_infini.h"
 
 namespace torch_infini {
 
@@ -12,7 +12,7 @@ struct AllocationContext {
   int device;
 };
 
-void InfiniDelete(void* context) {
+void delete_allocation(void* context) {
   auto* allocation = static_cast<AllocationContext*>(context);
   if (allocation == nullptr) {
     return;
@@ -22,33 +22,36 @@ void InfiniDelete(void* context) {
   delete allocation;
 }
 
-class InfiniAllocator final : public c10::Allocator {
+class Allocator final : public c10::Allocator {
  public:
   c10::DataPtr allocate(size_t nbytes) override {
     void* data = nullptr;
-    const int device_index = CurrentDevice();
+    const int device_index = current_device();
     if (nbytes != 0) {
-      Check(rt::Malloc(&data, nbytes), "Malloc");
+      check(rt::Malloc(&data, nbytes), "Malloc");
     }
     const auto device =
         c10::Device{kDeviceType, static_cast<c10::DeviceIndex>(device_index)};
     return {
-        data, new AllocationContext{data, device_index}, &InfiniDelete, device};
+        data,
+        new AllocationContext{data, device_index},
+        &delete_allocation,
+        device};
   }
 
   void copy_data(void* dest, const void* src, std::size_t count)
       const override {
-    Check(
+    check(
         rt::Memcpy(dest, src, count, rt::kMemcpyDeviceToDevice),
         "Memcpy(DeviceToDevice)");
   }
 };
 
-InfiniAllocator g_allocator;
+Allocator g_allocator;
 
 } // namespace
 
-c10::Allocator* GetInfiniAllocator() {
+c10::Allocator* get_allocator() {
   return &g_allocator;
 }
 

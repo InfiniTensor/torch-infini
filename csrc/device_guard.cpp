@@ -3,20 +3,20 @@
 #include <c10/core/impl/DeviceGuardImplInterface.h>
 #include <c10/util/Exception.h>
 
-#include "infini_torch.h"
+#include "torch_infini.h"
 
 namespace torch_infini {
 
 namespace {
 
-c10::Device CheckedInfiniDevice(c10::Device device) {
+c10::Device checked_device(c10::Device device) {
   TORCH_CHECK(
       device.type() == kDeviceType, "expected an infini device, got ", device);
-  const auto index = device.has_index() ? device.index() : CurrentDevice();
+  const auto index = device.has_index() ? device.index() : current_device();
   return c10::Device{kDeviceType, static_cast<c10::DeviceIndex>(index)};
 }
 
-class InfiniDeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
+class DeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
  public:
   c10::DeviceType type() const override {
     return kDeviceType;
@@ -30,11 +30,11 @@ class InfiniDeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
 
   c10::Device getDevice() const override {
     return c10::Device{
-        kDeviceType, static_cast<c10::DeviceIndex>(CurrentDevice())};
+        kDeviceType, static_cast<c10::DeviceIndex>(current_device())};
   }
 
   void setDevice(c10::Device device) const override {
-    SetDevice(CheckedInfiniDevice(device).index());
+    set_device(checked_device(device).index());
   }
 
   void uncheckedSetDevice(c10::Device device) const noexcept override {
@@ -50,7 +50,7 @@ class InfiniDeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   }
 
   c10::Stream getDefaultStream(c10::Device device) const override {
-    return c10::Stream(c10::Stream::DEFAULT, CheckedInfiniDevice(device));
+    return c10::Stream(c10::Stream::DEFAULT, checked_device(device));
   }
 
   c10::Stream getNewStream(c10::Device device, int priority = 0)
@@ -68,7 +68,7 @@ class InfiniDeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   }
 
   c10::DeviceIndex deviceCount() const noexcept override {
-    return static_cast<c10::DeviceIndex>(DeviceCount());
+    return static_cast<c10::DeviceIndex>(device_count());
   }
 
   bool queryStream(const c10::Stream& stream) const override {
@@ -84,16 +84,16 @@ class InfiniDeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
         stream.device_type() == kDeviceType,
         "expected an infini stream, got ",
         stream);
-    Synchronize(stream.device_index());
+    synchronize(stream.device_index());
   }
 
   void synchronizeDevice(const c10::DeviceIndex device_index) const override {
-    Synchronize(device_index);
+    synchronize(device_index);
   }
 };
 
 } // namespace
 
-C10_REGISTER_GUARD_IMPL(PrivateUse1, InfiniDeviceGuardImpl);
+C10_REGISTER_GUARD_IMPL(PrivateUse1, DeviceGuardImpl);
 
 } // namespace torch_infini

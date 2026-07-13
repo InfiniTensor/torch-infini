@@ -3,7 +3,7 @@
 
 #include <mutex>
 
-#include "infini_torch.h"
+#include "torch_infini.h"
 
 namespace torch_infini {
 
@@ -13,16 +13,16 @@ std::once_flag g_backend_init_once;
 
 } // namespace
 
-std::string RuntimeErrorMessage(rt::Error status, const char* call) {
+std::string runtime_error_message(rt::Error status, const char* call) {
   return std::string{"InfiniRT "} + call + " failed with status " +
       std::to_string(static_cast<int>(status));
 }
 
-void Check(rt::Error status, const char* call) {
-  TORCH_CHECK(status == rt::kSuccess, RuntimeErrorMessage(status, call));
+void check(rt::Error status, const char* call) {
+  TORCH_CHECK(status == rt::kSuccess, runtime_error_message(status, call));
 }
 
-int DeviceCount() noexcept {
+int device_count() noexcept {
   int count = 0;
   if (rt::GetDeviceCount(&count) != rt::kSuccess) {
     return 0;
@@ -30,29 +30,29 @@ int DeviceCount() noexcept {
   return count;
 }
 
-int CurrentDevice() {
+int current_device() {
   int device = 0;
-  Check(rt::GetDevice(&device), "GetDevice");
+  check(rt::GetDevice(&device), "GetDevice");
   return device;
 }
 
-void SetDevice(int device) {
+void set_device(int device) {
   TORCH_CHECK(device >= 0, "infini device index must be non-negative");
-  Check(rt::SetDevice(device), "SetDevice");
+  check(rt::SetDevice(device), "SetDevice");
 }
 
-void Synchronize(int device) {
-  SetDevice(device);
-  Check(rt::DeviceSynchronize(), "DeviceSynchronize");
+void synchronize(int device) {
+  set_device(device);
+  check(rt::DeviceSynchronize(), "DeviceSynchronize");
 }
 
-bool IsAvailable() {
-  return DeviceCount() > 0;
+bool is_available() {
+  return device_count() > 0;
 }
 
-std::string DeviceName(int device) {
+std::string device_name(int device) {
   TORCH_CHECK(device >= 0, "infini device index must be non-negative");
-  const int count = DeviceCount();
+  const int count = device_count();
   TORCH_CHECK(
       device < count,
       "infini device index ",
@@ -63,7 +63,7 @@ std::string DeviceName(int device) {
   return std::string{kBackendName} + ":" + std::to_string(device);
 }
 
-void InitializeBackend() {
+void initialize_backend() {
   std::call_once(g_backend_init_once, [] {
     if (c10::is_privateuse1_backend_registered()) {
       TORCH_CHECK(

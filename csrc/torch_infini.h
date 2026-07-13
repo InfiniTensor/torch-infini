@@ -1,5 +1,5 @@
-#ifndef TORCH_INFINI_INFINI_TORCH_H_
-#define TORCH_INFINI_INFINI_TORCH_H_
+#ifndef TORCH_INFINI_TORCH_INFINI_H_
+#define TORCH_INFINI_TORCH_INFINI_H_
 
 #include <ATen/ATen.h>
 #include <c10/core/Device.h>
@@ -18,22 +18,22 @@ namespace rt = infini::rt::runtime;
 constexpr const char* kBackendName = "infini";
 constexpr c10::DeviceType kDeviceType = c10::DeviceType::PrivateUse1;
 
-void Check(rt::Error status, const char* call);
+void check(rt::Error status, const char* call);
 
-std::string RuntimeErrorMessage(rt::Error status, const char* call);
+std::string runtime_error_message(rt::Error status, const char* call);
 
-int DeviceCount() noexcept;
-int CurrentDevice();
-void SetDevice(int device);
-void Synchronize(int device);
-bool IsAvailable();
-std::string DeviceName(int device);
+int device_count() noexcept;
+int current_device();
+void set_device(int device);
+void synchronize(int device);
+bool is_available();
+std::string device_name(int device);
 
-void InitializeBackend();
+void initialize_backend();
 
-c10::Allocator* GetInfiniAllocator();
+c10::Allocator* get_allocator();
 
-at::Tensor InfiniEmpty(
+at::Tensor empty(
     c10::SymIntArrayRef size,
     std::optional<c10::ScalarType> dtype,
     std::optional<c10::Layout> layout,
@@ -41,7 +41,7 @@ at::Tensor InfiniEmpty(
     std::optional<bool> pin_memory,
     std::optional<c10::MemoryFormat> memory_format);
 
-at::Tensor InfiniEmptyStrided(
+at::Tensor empty_strided(
     c10::SymIntArrayRef size,
     c10::SymIntArrayRef stride,
     std::optional<c10::ScalarType> dtype,
@@ -49,11 +49,8 @@ at::Tensor InfiniEmptyStrided(
     std::optional<c10::Device> device,
     std::optional<bool> pin_memory);
 
-at::Tensor& InfiniCopy(
-    at::Tensor& self,
-    const at::Tensor& src,
-    bool non_blocking);
+at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking);
 
 } // namespace torch_infini
 
-#endif // TORCH_INFINI_INFINI_TORCH_H_
+#endif // TORCH_INFINI_TORCH_INFINI_H_

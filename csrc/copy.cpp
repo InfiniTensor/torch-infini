@@ -1,81 +1,78 @@
 #include <c10/core/DeviceType.h>
 #include <c10/util/Exception.h>
 
-#include "infini_torch.h"
+#include "torch_infini.h"
 
 namespace torch_infini {
 
 namespace {
 
-bool IsInfini(const at::Tensor& tensor) {
+bool is_infini(const at::Tensor& tensor) {
   return tensor.device().type() == kDeviceType;
 }
 
-bool IsCpu(const at::Tensor& tensor) {
+bool is_cpu(const at::Tensor& tensor) {
   return tensor.device().type() == c10::DeviceType::CPU;
 }
 
-std::size_t TensorNbytes(const at::Tensor& tensor) {
+std::size_t tensor_nbytes(const at::Tensor& tensor) {
   return static_cast<std::size_t>(tensor.numel()) *
       static_cast<std::size_t>(tensor.element_size());
 }
 
-void CheckCopyShape(const at::Tensor& dst, const at::Tensor& src) {
+void check_copy_shape(const at::Tensor& dst, const at::Tensor& src) {
   TORCH_CHECK(
       dst.scalar_type() == src.scalar_type(),
-      "infini copy_ MVP requires matching dtype, got ",
+      "infini copy_ currently requires matching dtype, got ",
       dst.scalar_type(),
       " and ",
       src.scalar_type());
   TORCH_CHECK(
       dst.sizes().equals(src.sizes()),
-      "infini copy_ MVP requires matching sizes, got ",
+      "infini copy_ currently requires matching sizes, got ",
       dst.sizes(),
       " and ",
       src.sizes());
   TORCH_CHECK(
       dst.is_contiguous() && src.is_contiguous(),
-      "infini copy_ MVP only supports contiguous tensors");
+      "infini copy_ currently only supports contiguous tensors");
 }
 
 } // namespace
 
-at::Tensor& InfiniCopy(
-    at::Tensor& self,
-    const at::Tensor& src,
-    bool non_blocking) {
+at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
   (void)non_blocking;
-  CheckCopyShape(self, src);
+  check_copy_shape(self, src);
 
-  const auto nbytes = TensorNbytes(self);
+  const auto nbytes = tensor_nbytes(self);
   if (nbytes == 0) {
     return self;
   }
 
-  if (IsInfini(self) && IsCpu(src)) {
-    SetDevice(self.device().index());
-    Check(
+  if (is_infini(self) && is_cpu(src)) {
+    set_device(self.device().index());
+    check(
         rt::Memcpy(
             self.data_ptr(), src.data_ptr(), nbytes, rt::kMemcpyHostToDevice),
         "Memcpy(HostToDevice)");
     return self;
   }
 
-  if (IsCpu(self) && IsInfini(src)) {
-    SetDevice(src.device().index());
-    Check(
+  if (is_cpu(self) && is_infini(src)) {
+    set_device(src.device().index());
+    check(
         rt::Memcpy(
             self.data_ptr(), src.data_ptr(), nbytes, rt::kMemcpyDeviceToHost),
         "Memcpy(DeviceToHost)");
     return self;
   }
 
-  if (IsInfini(self) && IsInfini(src)) {
+  if (is_infini(self) && is_infini(src)) {
     TORCH_CHECK(
         self.device().index() == src.device().index(),
-        "infini copy_ MVP only supports same-device copies");
-    SetDevice(self.device().index());
-    Check(
+        "infini copy_ currently only supports same-device copies");
+    set_device(self.device().index());
+    check(
         rt::Memcpy(
             self.data_ptr(), src.data_ptr(), nbytes, rt::kMemcpyDeviceToDevice),
         "Memcpy(DeviceToDevice)");
@@ -86,7 +83,7 @@ at::Tensor& InfiniCopy(
 }
 
 TORCH_LIBRARY_IMPL(aten, PrivateUse1, m) {
-  m.impl("copy_", TORCH_FN(InfiniCopy));
+  m.impl("copy_", TORCH_FN(copy_));
 }
 
 } // namespace torch_infini
