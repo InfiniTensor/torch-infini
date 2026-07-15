@@ -45,6 +45,16 @@ headers. For those installations, set `CUDA_INCLUDE_DIRS` when CUDA headers are
 outside the standard toolkit paths. `torch-infini` does not otherwise depend on
 CUDA; InfiniRT should eventually export any required transitive include paths.
 
+## Runtime backend
+
+torch-infini automatically uses an accelerator backend compiled into InfiniRT
+when that backend reports at least one available device. When no compiled
+accelerator backend has an available device, it falls back to CPU when CPU
+support is included in the InfiniRT build. torch-infini requires this CPU
+support so the fallback is always available. InfiniRT stores its selection per
+thread, so torch-infini binds the selected backend whenever a thread enters a
+runtime operation.
+
 ## Scope
 
 The initial implementation supports:

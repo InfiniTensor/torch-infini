@@ -41,6 +41,9 @@ class DeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
     if (device.type() != kDeviceType) {
       return;
     }
+    if (!try_ensure_runtime_backend_for_current_thread()) {
+      return;
+    }
     const auto index = device.has_index() ? device.index() : 0;
     (void)rt::SetDevice(index);
   }
