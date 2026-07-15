@@ -29,7 +29,10 @@ void synchronize(int device);
 bool is_available();
 std::string device_name(int device);
 
-void initialize_backend();
+void register_backend();
+bool try_ensure_runtime_backend_for_current_thread() noexcept;
+void ensure_runtime_backend_for_current_thread();
+std::string runtime_backend_name();
 
 c10::Allocator* get_allocator();
 

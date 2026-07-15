@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 import torch
 
@@ -9,11 +11,18 @@ def test_privateuse1_backend_is_named_infini():
     assert hasattr(torch, "infini")
 
 
+def test_runtime_backend_is_selected_automatically():
+    assert torch.infini.is_available()
+    assert torch.infini.device_count() > 0
+
+
 @pytest.mark.parametrize(
     "name",
     [
         "current_stream",
         "default_stream",
+        "get_backend",
+        "init",
         "is_initialized",
         "manual_seed",
         "manual_seed_all",
@@ -47,6 +56,18 @@ def test_empty_and_cpu_roundtrip():
     out.copy_(dst)
 
     torch.testing.assert_close(out, src)
+
+
+@pytest.mark.skipif(not torch.infini.is_available(), reason="no infini device")
+def test_tensor_can_be_destroyed_on_worker_thread():
+    tensors = [torch.empty(16, device="infini")]
+
+    worker = threading.Thread(target=tensors.clear)
+    worker.start()
+    worker.join()
+
+    assert not tensors
+    torch.infini.synchronize()
 
 
 if __name__ == "__main__":

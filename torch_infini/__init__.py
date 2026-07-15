@@ -55,7 +55,6 @@ def _generate_privateuse1_methods() -> None:
             raise
 
 
-_C.initialize()
 _install_device_module()
 _generate_privateuse1_methods()
 

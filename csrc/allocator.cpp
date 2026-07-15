@@ -17,6 +17,11 @@ void delete_allocation(void* context) {
   if (allocation == nullptr) {
     return;
   }
+  // A DataPtr may be destroyed on a different thread from its allocation.
+  if (!try_ensure_runtime_backend_for_current_thread()) {
+    delete allocation;
+    return;
+  }
   (void)rt::SetDevice(allocation->device);
   (void)rt::Free(allocation->ptr);
   delete allocation;
@@ -41,6 +46,7 @@ class Allocator final : public c10::Allocator {
 
   void copy_data(void* dest, const void* src, std::size_t count)
       const override {
+    ensure_runtime_backend_for_current_thread();
     check(
         rt::Memcpy(dest, src, count, rt::kMemcpyDeviceToDevice),
         "Memcpy(DeviceToDevice)");
