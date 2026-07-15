@@ -1,0 +1,28 @@
+name: Lint
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install linters
+        run: >-
+          python -m pip install
+          clang-format==19.1.4
+          ruff==0.15.21
+      - name: Run Ruff
+        run: |
+          ruff check setup.py torch_infini tests
+          ruff format --check setup.py torch_infini tests
+      - name: Run clang-format
+        run: clang-format --dry-run --Werror csrc/*.cpp csrc/*.h

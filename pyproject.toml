@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=69", "wheel", "torch"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torch-infini"
+version = "0.1.0"
+description = "PyTorch PrivateUse1 plugin for the Infini accelerator stack"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["torch"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
+]
+
+[project.optional-dependencies]
+dev = [
+    "clang-format==19.1.4",
+    "pytest",
+    "ruff==0.15.21",
+]
+
+[tool.setuptools]
+packages = ["torch_infini"]
+
+[tool.ruff]
+line-length = 88
+src = ["torch_infini", "tests"]
+exclude = [
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+quote-style = "double"
+
+[tool.ruff.lint]
+select = [
+    "B",
+    "C4",
+    "E",
+    "F",
+    "PT",
+    "RUF",
+    "SIM",
+    "UP",
+    "W",
+]
+ignore = [
+]
+
+[tool.ruff.lint.per-file-ignores]
+"torch_infini/__init__.py" = ["E402", "F401"]
