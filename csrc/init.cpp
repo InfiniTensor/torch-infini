@@ -1,6 +1,8 @@
 #include <pybind11/pybind11.h>
 #include <torch/extension.h>
 
+#include <cstdint>
+
 #include "torch_infini.h"
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
@@ -13,4 +15,14 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("set_device", &torch_infini::set_device);
   m.def("synchronize", &torch_infini::synchronize);
   m.def("get_device_name", &torch_infini::device_name);
+  m.def("_stream_native_handle", [](std::int64_t stream_id, int device_index) {
+    const auto stream = c10::Stream{
+        c10::Stream::UNSAFE,
+        c10::Device{
+            torch_infini::kDeviceType,
+            static_cast<c10::DeviceIndex>(device_index)},
+        stream_id};
+    return reinterpret_cast<std::uintptr_t>(
+        torch_infini::get_native_stream_handle(stream));
+  });
 }

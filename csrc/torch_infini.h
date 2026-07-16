@@ -4,6 +4,7 @@
 #include <ATen/ATen.h>
 #include <c10/core/Device.h>
 #include <c10/core/DeviceType.h>
+#include <c10/core/Stream.h>
 #include <infini/rt.h>
 #include <torch/library.h>
 
@@ -33,6 +34,17 @@ void register_backend();
 bool try_ensure_runtime_backend_for_current_thread() noexcept;
 void ensure_runtime_backend_for_current_thread();
 std::string runtime_backend_name();
+
+c10::Stream get_current_stream(c10::Device device);
+c10::Stream get_default_stream(c10::Device device);
+c10::Stream create_stream(c10::Device device, int priority);
+c10::Stream get_stream_from_global_pool(
+    c10::Device device,
+    bool is_high_priority);
+c10::Stream exchange_current_stream(c10::Stream stream);
+void* get_native_stream_handle(c10::Stream stream);
+bool query_stream(const c10::Stream& stream);
+void synchronize_stream(const c10::Stream& stream);
 
 c10::Allocator* get_allocator();
 

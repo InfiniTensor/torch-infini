@@ -18,9 +18,9 @@ out.copy_(x)
 torch.testing.assert_close(out, src)
 ```
 
-This first-step bridge is intentionally narrow. It wires PyTorch device
-management, allocation, synchronization, and contiguous tensor copies to
-InfiniRT. General ATen operator coverage is left to later InfiniCore and
+This first-step bridge is intentionally narrow. It wires PyTorch device and
+stream management, allocation, synchronization, and contiguous tensor copies
+to InfiniRT. General ATen operator coverage is left to later InfiniCore and
 InfiniOps integration work.
 
 The implementation follows PyTorch's documented out-of-tree backend path:
@@ -76,11 +76,17 @@ The initial implementation supports:
 - `torch.infini.current_device()`
 - `torch.infini.set_device(index)`
 - `torch.infini.synchronize()`
+- `torch.infini.Stream()`
+- `torch.infini.current_stream()`
+- `torch.infini.default_stream()`
+- `torch.infini.set_stream(stream)`
+- `torch.infini.stream(stream)`
 - `torch.empty(..., device="infini")`
 - `torch.empty_strided(..., device="infini")`
 - contiguous `copy_` between CPU and Infini tensors
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
-device-management operations it implements. Stream, event, random-number, and
-general ATen operator support are not exposed yet. Unsupported operations should
-fail clearly instead of silently falling back through CPU.
+device and stream-management operations it implements. Stream priorities,
+events, random-number generation, asynchronous memory and copy behavior, and
+general ATen operators are not exposed yet. Unsupported operations should fail
+clearly instead of silently falling back through CPU.

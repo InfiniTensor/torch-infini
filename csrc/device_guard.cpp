@@ -49,25 +49,30 @@ class DeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   }
 
   c10::Stream getStream(c10::Device device) const override {
-    return getDefaultStream(device);
+    return get_current_stream(device);
   }
 
   c10::Stream getDefaultStream(c10::Device device) const override {
-    return c10::Stream(c10::Stream::DEFAULT, checked_device(device));
+    return get_default_stream(device);
+  }
+
+  c10::Stream getStreamFromGlobalPool(
+      c10::Device device,
+      bool is_high_priority = false) const override {
+    return get_stream_from_global_pool(device, is_high_priority);
   }
 
   c10::Stream getNewStream(c10::Device device, int priority = 0)
       const override {
-    (void)priority;
-    return getDefaultStream(device);
+    return create_stream(device, priority);
   }
 
   c10::Stream exchangeStream(c10::Stream stream) const override {
-    TORCH_CHECK(
-        stream.device_type() == kDeviceType,
-        "expected an infini stream, got ",
-        stream);
-    return getDefaultStream(stream.device());
+    return exchange_current_stream(stream);
+  }
+
+  void* getStreamNativeHandle(c10::Stream stream) const {
+    return get_native_stream_handle(stream);
   }
 
   c10::DeviceIndex deviceCount() const noexcept override {
@@ -75,19 +80,11 @@ class DeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   }
 
   bool queryStream(const c10::Stream& stream) const override {
-    TORCH_CHECK(
-        stream.device_type() == kDeviceType,
-        "expected an infini stream, got ",
-        stream);
-    return true;
+    return query_stream(stream);
   }
 
   void synchronizeStream(const c10::Stream& stream) const override {
-    TORCH_CHECK(
-        stream.device_type() == kDeviceType,
-        "expected an infini stream, got ",
-        stream);
-    synchronize(stream.device_index());
+    synchronize_stream(stream);
   }
 
   void synchronizeDevice(const c10::DeviceIndex device_index) const override {

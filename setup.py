@@ -82,6 +82,7 @@ setup(
                 "csrc/empty.cpp",
                 "csrc/init.cpp",
                 "csrc/runtime.cpp",
+                "csrc/stream.cpp",
             ],
             include_dirs=[*include_dirs, str(PACKAGE_ROOT / "csrc")],
             libraries=["infinirt"],
