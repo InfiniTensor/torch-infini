@@ -41,11 +41,16 @@ def _cuda_include_dirs():
     return existing_dirs
 
 
-def _infini_paths():
+def _dependency_paths(
+    dependency_name,
+    prefix_variable,
+    include_dirs_variable,
+    library_dirs_variable,
+):
     include_dirs = []
     library_dirs = []
 
-    prefix = os.environ.get("INFINI_RT_PREFIX")
+    prefix = os.environ.get(prefix_variable)
     if prefix:
         prefix_path = Path(prefix)
         include_dirs.append(str(prefix_path / "include"))
@@ -55,20 +60,34 @@ def _infini_paths():
             if path.exists()
         )
 
-    include_dirs.extend(_split_paths(os.environ.get("INFINI_RT_INCLUDE_DIRS", "")))
-    library_dirs.extend(_split_paths(os.environ.get("INFINI_RT_LIBRARY_DIRS", "")))
+    include_dirs.extend(_split_paths(os.environ.get(include_dirs_variable, "")))
+    library_dirs.extend(_split_paths(os.environ.get(library_dirs_variable, "")))
 
     if not include_dirs:
         raise RuntimeError(
-            "InfiniRT headers were not found. Set INFINI_RT_PREFIX to an "
-            "installed InfiniRT prefix, or set INFINI_RT_INCLUDE_DIRS."
+            f"{dependency_name} headers were not found. Set {prefix_variable} "
+            f"to an installed {dependency_name} prefix, or set "
+            f"{include_dirs_variable}."
         )
 
     return include_dirs, library_dirs
 
 
-include_dirs, library_dirs = _infini_paths()
+infini_ops_include_dirs, infini_ops_library_dirs = _dependency_paths(
+    "InfiniOps",
+    "INFINI_OPS_PREFIX",
+    "INFINI_OPS_INCLUDE_DIRS",
+    "INFINI_OPS_LIBRARY_DIRS",
+)
+infini_rt_include_dirs, infini_rt_library_dirs = _dependency_paths(
+    "InfiniRT",
+    "INFINI_RT_PREFIX",
+    "INFINI_RT_INCLUDE_DIRS",
+    "INFINI_RT_LIBRARY_DIRS",
+)
+include_dirs = [*infini_ops_include_dirs, *infini_rt_include_dirs]
 include_dirs.extend(_cuda_include_dirs())
+library_dirs = [*infini_ops_library_dirs, *infini_rt_library_dirs]
 
 setup(
     packages=["torch_infini"],
@@ -80,14 +99,21 @@ setup(
                 "csrc/copy.cpp",
                 "csrc/device_guard.cpp",
                 "csrc/empty.cpp",
+                "csrc/infini_ops.cpp",
                 "csrc/init.cpp",
                 "csrc/runtime.cpp",
                 "csrc/stream.cpp",
             ],
             include_dirs=[*include_dirs, str(PACKAGE_ROOT / "csrc")],
-            libraries=["infinirt"],
+            libraries=[],
             library_dirs=library_dirs,
             extra_compile_args={"cxx": ["-std=c++17"]},
+            extra_link_args=[
+                "-Wl,--no-as-needed",
+                "-linfiniops",
+                "-linfinirt",
+                "-Wl,--as-needed",
+            ],
         )
     ],
     cmdclass={"build_ext": BuildExtension},
