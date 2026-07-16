@@ -44,7 +44,6 @@ def _cuda_include_dirs():
 def _infini_paths():
     include_dirs = []
     library_dirs = []
-    runtime_library_dirs = []
 
     prefix = os.environ.get("INFINI_RT_PREFIX")
     if prefix:
@@ -55,13 +54,9 @@ def _infini_paths():
             for path in (prefix_path / "lib", prefix_path / "lib64")
             if path.exists()
         )
-        runtime_library_dirs.extend(library_dirs)
 
     include_dirs.extend(_split_paths(os.environ.get("INFINI_RT_INCLUDE_DIRS", "")))
     library_dirs.extend(_split_paths(os.environ.get("INFINI_RT_LIBRARY_DIRS", "")))
-    runtime_library_dirs.extend(
-        _split_paths(os.environ.get("INFINI_RT_RUNTIME_LIBRARY_DIRS", ""))
-    )
 
     if not include_dirs:
         raise RuntimeError(
@@ -69,10 +64,10 @@ def _infini_paths():
             "installed InfiniRT prefix, or set INFINI_RT_INCLUDE_DIRS."
         )
 
-    return include_dirs, library_dirs, runtime_library_dirs
+    return include_dirs, library_dirs
 
 
-include_dirs, library_dirs, runtime_library_dirs = _infini_paths()
+include_dirs, library_dirs = _infini_paths()
 include_dirs.extend(_cuda_include_dirs())
 
 setup(
@@ -91,7 +86,6 @@ setup(
             include_dirs=[*include_dirs, str(PACKAGE_ROOT / "csrc")],
             libraries=["infinirt"],
             library_dirs=library_dirs,
-            runtime_library_dirs=runtime_library_dirs,
             extra_compile_args={"cxx": ["-std=c++17"]},
         )
     ],

@@ -36,9 +36,20 @@ export INFINI_RT_PREFIX=/path/to/infini-rt-prefix
 pip install --no-build-isolation --no-deps .
 ```
 
-`INFINI_RT_INCLUDE_DIRS`, `INFINI_RT_LIBRARY_DIRS`, and
-`INFINI_RT_RUNTIME_LIBRARY_DIRS` can be used when the headers or library are not
-under a single install prefix.
+`INFINI_RT_INCLUDE_DIRS` and `INFINI_RT_LIBRARY_DIRS` can be used when the
+headers or library are not under a single install prefix.
+
+The wheel links to `libinfinirt.so` but does not bundle it. Before importing
+`torch_infini`, make the InfiniRT library directory available to the dynamic
+loader. Add the directory to the system loader configuration and run
+`ldconfig`, or expose it for the current shell:
+
+```bash
+export LD_LIBRARY_PATH="/path/to/infini-rt-prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+```
+
+Use `lib64` instead of `lib` when that is the library directory in the InfiniRT
+install prefix.
 
 Some InfiniRT installations currently expose CUDA headers through their public
 headers. For those installations, set `CUDA_INCLUDE_DIRS` when CUDA headers are
