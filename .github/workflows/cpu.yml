@@ -1,0 +1,107 @@
+name: CPU build and test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  cpu:
+    name: CPU
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      INFINIRT_COMMIT: 95c70080f9551e61241110497d163dfcdf9dc7e7
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - name: Check out torch-infini
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12.13"
+      - name: Install pinned build and test tools
+        run: |
+          python -m pip install --upgrade pip==25.1.1
+          python -m pip install \
+            cmake==4.0.3 \
+            ninja==1.11.1.4 \
+            numpy==2.2.6 \
+            pytest==8.4.1 \
+            setuptools==80.9.0 \
+            wheel==0.45.1
+          python -m pip install \
+            --index-url https://download.pytorch.org/whl/cpu \
+            torch==2.13.0+cpu
+      - name: Fetch pinned InfiniRT source
+        run: |
+          git init "$RUNNER_TEMP/InfiniRT"
+          git -C "$RUNNER_TEMP/InfiniRT" remote add origin \
+            https://github.com/InfiniTensor/InfiniRT.git
+          git -C "$RUNNER_TEMP/InfiniRT" fetch --depth=1 origin \
+            "$INFINIRT_COMMIT"
+          git -C "$RUNNER_TEMP/InfiniRT" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/InfiniRT" rev-parse HEAD)" = \
+            "$INFINIRT_COMMIT"
+      - name: Build CPU-only InfiniRT
+        env:
+          INFINI_RT_PREFIX: ${{ runner.temp }}/infinirt-install
+        run: |
+          cmake \
+            -S "$RUNNER_TEMP/InfiniRT" \
+            -B "$RUNNER_TEMP/InfiniRT/build" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$INFINI_RT_PREFIX" \
+            -DAUTO_DETECT_DEVICES=OFF \
+            -DINFINI_RT_BUILD_TESTING=OFF \
+            -DWITH_CPU=ON
+          cmake --build "$RUNNER_TEMP/InfiniRT/build" --parallel 2
+          cmake --install "$RUNNER_TEMP/InfiniRT/build"
+      - name: Build torch-infini wheel
+        env:
+          INFINI_RT_PREFIX: ${{ runner.temp }}/infinirt-install
+        run: >-
+          python -m pip wheel .
+          --wheel-dir "$RUNNER_TEMP/wheelhouse"
+          --no-build-isolation
+          --no-deps
+      - name: Install torch-infini wheel outside the source tree
+        working-directory: ${{ runner.temp }}
+        run: >-
+          python -m pip install
+          --no-deps
+          "$RUNNER_TEMP"/wheelhouse/*.whl
+      - name: Verify automatic CPU fallback
+        working-directory: ${{ runner.temp }}
+        env:
+          LD_LIBRARY_PATH: ${{ runner.temp }}/infinirt-install/lib
+        run: |
+          python - <<'PY'
+          import torch
+          import torch_infini
+
+          assert torch_infini._C._runtime_backend_name() == "cpu"
+          assert torch.infini.is_available()
+          assert torch.infini.device_count() > 0
+          assert not hasattr(torch.infini, "init")
+
+          source = torch.arange(16, dtype=torch.float32).reshape(4, 4)
+          device = torch.empty_like(source, device="infini")
+          device.copy_(source)
+          result = torch.empty_like(source)
+          result.copy_(device)
+          torch.testing.assert_close(result, source)
+          PY
+      - name: Run test suite outside the source tree
+        working-directory: ${{ runner.temp }}
+        env:
+          LD_LIBRARY_PATH: ${{ runner.temp }}/infinirt-install/lib
+          TORCH_INFINI_TEST_EXPECTED_BACKEND: cpu
+        run: python -m pytest -q "$GITHUB_WORKSPACE/tests"
