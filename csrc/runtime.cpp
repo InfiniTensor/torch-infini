@@ -1,3 +1,4 @@
+#include <c10/core/DeviceGuard.h>
 #include <c10/core/DeviceType.h>
 #include <c10/util/Exception.h>
 
@@ -125,7 +126,9 @@ void set_device(int device) {
 }
 
 void synchronize(int device) {
-  set_device(device);
+  TORCH_CHECK(device >= 0, "infini device index must be non-negative");
+  const c10::DeviceGuard guard{
+      c10::Device{kDeviceType, static_cast<c10::DeviceIndex>(device)}};
   check(rt::DeviceSynchronize(), "DeviceSynchronize");
 }
 

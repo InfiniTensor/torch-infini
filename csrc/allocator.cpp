@@ -1,5 +1,6 @@
 #include <c10/core/Allocator.h>
 #include <c10/core/Device.h>
+#include <c10/core/DeviceGuard.h>
 
 #include "torch_infini.h"
 
@@ -22,8 +23,12 @@ void delete_allocation(void* context) {
     delete allocation;
     return;
   }
-  (void)rt::SetDevice(allocation->device);
-  (void)rt::Free(allocation->ptr);
+  try {
+    const c10::DeviceGuard guard{c10::Device{
+        kDeviceType, static_cast<c10::DeviceIndex>(allocation->device)}};
+    (void)rt::Free(allocation->ptr);
+  } catch (...) {
+  }
   delete allocation;
 }
 
