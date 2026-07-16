@@ -1,3 +1,4 @@
+#include <c10/core/DeviceGuard.h>
 #include <c10/core/DeviceType.h>
 #include <c10/util/Exception.h>
 
@@ -50,7 +51,7 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
   }
 
   if (is_infini(self) && is_cpu(src)) {
-    set_device(self.device().index());
+    const c10::DeviceGuard guard{self.device()};
     check(
         rt::Memcpy(
             self.data_ptr(), src.data_ptr(), nbytes, rt::kMemcpyHostToDevice),
@@ -59,7 +60,7 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
   }
 
   if (is_cpu(self) && is_infini(src)) {
-    set_device(src.device().index());
+    const c10::DeviceGuard guard{src.device()};
     check(
         rt::Memcpy(
             self.data_ptr(), src.data_ptr(), nbytes, rt::kMemcpyDeviceToHost),
@@ -71,7 +72,7 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
     TORCH_CHECK(
         self.device().index() == src.device().index(),
         "infini copy_ currently only supports same-device copies");
-    set_device(self.device().index());
+    const c10::DeviceGuard guard{self.device()};
     check(
         rt::Memcpy(
             self.data_ptr(), src.data_ptr(), nbytes, rt::kMemcpyDeviceToDevice),

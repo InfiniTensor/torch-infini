@@ -1,6 +1,7 @@
 #include <ATen/EmptyTensor.h>
 #include <ATen/InitialTensorOptions.h>
 #include <c10/core/Allocator.h>
+#include <c10/core/DeviceGuard.h>
 #include <c10/core/DispatchKey.h>
 #include <c10/util/Exception.h>
 
@@ -57,7 +58,7 @@ at::Tensor empty(
     std::optional<c10::MemoryFormat> memory_format) {
   check_options(layout, pin_memory);
   const auto normalized_device = normalize_device(device);
-  set_device(normalized_device.index());
+  const c10::DeviceGuard guard{normalized_device};
   return at::detail::empty_generic_symint(
       size,
       get_allocator(),
@@ -75,7 +76,7 @@ at::Tensor empty_strided(
     std::optional<bool> pin_memory) {
   check_options(layout, pin_memory);
   const auto normalized_device = normalize_device(device);
-  set_device(normalized_device.index());
+  const c10::DeviceGuard guard{normalized_device};
   return at::detail::empty_strided_symint_generic(
       size,
       stride,
