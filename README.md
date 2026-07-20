@@ -41,7 +41,7 @@ cmake -S /path/to/InfiniOps -B /tmp/infini-ops-build \
   -DWITH_TORCH=OFF \
   -DGENERATE_OPERATOR_CALL_INSTANTIATIONS=ON \
   -DINFINI_OPS_OPS=add
-cmake --build /tmp/infini-ops-build -j
+cmake --build /tmp/infini-ops-build --target infiniops -j
 cmake --install /tmp/infini-ops-build
 ```
 
