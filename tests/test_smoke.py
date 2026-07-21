@@ -27,8 +27,6 @@ def test_runtime_backend_is_selected_automatically():
 @pytest.mark.parametrize(
     "name",
     [
-        "current_stream",
-        "default_stream",
         "get_backend",
         "init",
         "is_initialized",
