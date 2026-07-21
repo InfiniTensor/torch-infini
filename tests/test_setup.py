@@ -86,6 +86,7 @@ def test_infiniops_and_infinirt_paths_are_only_used_for_linking(monkeypatch, tmp
         str(extra_infini_rt_include_dir),
     ]
     assert extension["include_dirs"][-1] == str(REPO_ROOT / "csrc")
+    assert "csrc/add.cpp" in extension["sources"]
     assert "csrc/infini_ops.cpp" in extension["sources"]
     assert "runtime_library_dirs" not in extension
 

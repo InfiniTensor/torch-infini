@@ -1,5 +1,6 @@
 #include "infini_ops.h"
 
+#include <ATen/ExpandUtils.h>
 #include <c10/util/Exception.h>
 
 #include <limits>
@@ -103,11 +104,29 @@ infini::rt::TensorView to_tensor_view(const at::Tensor& tensor) {
   return {tensor.data_ptr(), shape, data_type, device, strides};
 }
 
+infini::rt::TensorView to_expanded_tensor_view(
+    const at::Tensor& tensor,
+    c10::IntArrayRef sizes) {
+  const auto geometry = at::inferExpandGeometry_dimvector(
+      tensor.sizes(), tensor.strides(), sizes);
+  const auto data_type = to_data_type(tensor.scalar_type());
+  const auto device = to_device(tensor.device());
+  const auto shape = to_shape(geometry.sizes);
+  const auto strides = to_strides(geometry.strides);
+  return {tensor.data_ptr(), shape, data_type, device, strides};
+}
+
 ExecutionContext make_execution_context(infini::rt::runtime::Stream stream) {
   ExecutionContext context;
   context.handle.set_stream(reinterpret_cast<void*>(stream));
   context.config.set_implementation_index(0);
   return context;
+}
+
+ExecutionContext make_execution_context(c10::Device device) {
+  const auto stream = get_current_stream(device);
+  return make_execution_context(reinterpret_cast<infini::rt::runtime::Stream>(
+      get_native_stream_handle(stream)));
 }
 
 } // namespace torch_infini::infini_ops

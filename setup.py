@@ -95,6 +95,7 @@ setup(
         CppExtension(
             name="torch_infini._C",
             sources=[
+                "csrc/add.cpp",
                 "csrc/allocator.cpp",
                 "csrc/copy.cpp",
                 "csrc/device_guard.cpp",
