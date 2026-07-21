@@ -19,9 +19,9 @@ torch.testing.assert_close(out, src)
 ```
 
 This first-step bridge is intentionally narrow. It wires PyTorch device and
-stream management, allocation, synchronization, and contiguous tensor copies
-to InfiniRT. General ATen operator coverage is left to later InfiniCore and
-InfiniOps integration work.
+stream management, allocation, synchronization, contiguous tensor copies, and
+shared ATen tensor metadata adapters to the Infini stack. General ATen operator
+coverage is left to later integration work.
 
 The implementation follows PyTorch's documented out-of-tree backend path:
 `PrivateUse1` is renamed to `infini`, C++ kernels are registered through the
@@ -29,26 +29,47 @@ dispatcher, and the extension is built with `torch.utils.cpp_extension`.
 
 ## Build
 
-Build and install InfiniRT first, then point this package at that prefix:
+Build and install InfiniRT first. Then build InfiniOps without its PyTorch
+backend and with the generated C++ operator call surface needed by downstream
+consumers. A focused CPU build can use a small operator allowlist:
+
+```bash
+cmake -S /path/to/InfiniOps -B /tmp/infini-ops-build \
+  -DCMAKE_INSTALL_PREFIX=/path/to/infini-ops-prefix \
+  -DINFINI_RT_ROOT=/path/to/infini-rt-prefix \
+  -DWITH_CPU=ON \
+  -DWITH_TORCH=OFF \
+  -DGENERATE_OPERATOR_CALL_INSTANTIATIONS=ON \
+  -DINFINI_OPS_OPS=add
+cmake --build /tmp/infini-ops-build --target infiniops -j
+cmake --install /tmp/infini-ops-build
+```
+
+Enable the InfiniOps backend options that match the InfiniRT build, such as
+`WITH_NVIDIA=ON`, when targeting an accelerator. Point this package at both
+installed prefixes:
 
 ```bash
 export INFINI_RT_PREFIX=/path/to/infini-rt-prefix
+export INFINI_OPS_PREFIX=/path/to/infini-ops-prefix
 pip install --no-build-isolation --no-deps .
 ```
 
-`INFINI_RT_INCLUDE_DIRS` and `INFINI_RT_LIBRARY_DIRS` can be used when the
-headers or library are not under a single install prefix.
+`INFINI_OPS_INCLUDE_DIRS`, `INFINI_OPS_LIBRARY_DIRS`,
+`INFINI_RT_INCLUDE_DIRS`, and `INFINI_RT_LIBRARY_DIRS` can be used when headers
+or libraries are not under their respective install prefixes.
 
-The wheel links to `libinfinirt.so` but does not bundle it. Before importing
-`torch_infini`, make the InfiniRT library directory available to the dynamic
-loader. Add the directory to the system loader configuration and run
-`ldconfig`, or expose it for the current shell:
+The wheel links to `libinfiniops.so` before `libinfinirt.so` but does not bundle
+either library or store their absolute build paths. Before importing
+`torch_infini`, make both library directories available to the dynamic loader.
+Add the directories to the system loader configuration and run `ldconfig`, or
+expose them for the current shell:
 
 ```bash
-export LD_LIBRARY_PATH="/path/to/infini-rt-prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="/path/to/infini-ops-prefix/lib:/path/to/infini-rt-prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 ```
 
-Use `lib64` instead of `lib` when that is the library directory in the InfiniRT
+Use `lib64` instead of `lib` when that is the library directory in either
 install prefix.
 
 Some InfiniRT installations currently expose CUDA headers through their public
@@ -84,9 +105,11 @@ The initial implementation supports:
 - `torch.empty(..., device="infini")`
 - `torch.empty_strided(..., device="infini")`
 - contiguous `copy_` between CPU and Infini tensors
+- internal ATen-to-InfiniRT TensorView and InfiniOps execution-context adapters
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
 device and stream-management operations it implements. Stream priorities,
 events, random-number generation, asynchronous memory and copy behavior, and
-general ATen operators are not exposed yet. Unsupported operations should fail
-clearly instead of silently falling back through CPU.
+general ATen operators are not exposed yet. This integration does not register
+an InfiniOps-backed ATen computational operator. Unsupported operations should
+fail clearly instead of silently falling back through CPU.

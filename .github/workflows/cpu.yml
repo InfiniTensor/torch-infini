@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 30
     env:
       INFINIRT_COMMIT: 95c70080f9551e61241110497d163dfcdf9dc7e7
+      INFINIOPS_COMMIT: 296271487beb594a248fd463e5fff14f7ab74293
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
     steps:
       - name: Check out torch-infini
@@ -64,8 +65,39 @@ jobs:
             -DWITH_CPU=ON
           cmake --build "$RUNNER_TEMP/InfiniRT/build" --parallel 2
           cmake --install "$RUNNER_TEMP/InfiniRT/build"
+      - name: Fetch pinned InfiniOps source
+        run: |
+          git init "$RUNNER_TEMP/InfiniOps"
+          git -C "$RUNNER_TEMP/InfiniOps" remote add origin \
+            https://github.com/InfiniTensor/InfiniOps.git
+          git -C "$RUNNER_TEMP/InfiniOps" fetch --depth=1 origin \
+            "$INFINIOPS_COMMIT"
+          git -C "$RUNNER_TEMP/InfiniOps" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/InfiniOps" rev-parse HEAD)" = \
+            "$INFINIOPS_COMMIT"
+      - name: Build CPU-only InfiniOps
+        env:
+          INFINI_OPS_PREFIX: ${{ runner.temp }}/infiniops-install
+          INFINI_RT_PREFIX: ${{ runner.temp }}/infinirt-install
+        run: |
+          cmake \
+            -S "$RUNNER_TEMP/InfiniOps" \
+            -B "$RUNNER_TEMP/InfiniOps/build" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$INFINI_OPS_PREFIX" \
+            -DINFINI_RT_ROOT="$INFINI_RT_PREFIX" \
+            -DWITH_CPU=ON \
+            -DWITH_TORCH=OFF \
+            -DGENERATE_OPERATOR_CALL_INSTANTIATIONS=ON \
+            -DINFINI_OPS_OPS=add
+          cmake --build "$RUNNER_TEMP/InfiniOps/build" \
+            --target infiniops \
+            --parallel 2
+          cmake --install "$RUNNER_TEMP/InfiniOps/build"
       - name: Build torch-infini wheel
         env:
+          INFINI_OPS_PREFIX: ${{ runner.temp }}/infiniops-install
           INFINI_RT_PREFIX: ${{ runner.temp }}/infinirt-install
         run: >-
           python -m pip wheel .
@@ -81,7 +113,7 @@ jobs:
       - name: Verify automatic CPU fallback
         working-directory: ${{ runner.temp }}
         env:
-          LD_LIBRARY_PATH: ${{ runner.temp }}/infinirt-install/lib
+          LD_LIBRARY_PATH: ${{ runner.temp }}/infiniops-install/lib:${{ runner.temp }}/infinirt-install/lib
         run: |
           python - <<'PY'
           import torch
@@ -102,6 +134,8 @@ jobs:
       - name: Run test suite outside the source tree
         working-directory: ${{ runner.temp }}
         env:
-          LD_LIBRARY_PATH: ${{ runner.temp }}/infinirt-install/lib
+          INFINI_OPS_PREFIX: ${{ runner.temp }}/infiniops-install
+          INFINI_RT_PREFIX: ${{ runner.temp }}/infinirt-install
+          LD_LIBRARY_PATH: ${{ runner.temp }}/infiniops-install/lib:${{ runner.temp }}/infinirt-install/lib
           TORCH_INFINI_TEST_EXPECTED_BACKEND: cpu
         run: python -m pytest -q "$GITHUB_WORKSPACE/tests"
