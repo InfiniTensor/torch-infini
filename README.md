@@ -12,16 +12,17 @@ import torch_infini
 src = torch.arange(16, dtype=torch.float32).reshape(4, 4)
 x = torch.empty(src.shape, dtype=src.dtype, device="infini:0")
 x.copy_(src)
+y = torch.add(x, x)
 
 out = torch.empty_like(src)
-out.copy_(x)
-torch.testing.assert_close(out, src)
+out.copy_(y)
+torch.testing.assert_close(out, src + src)
 ```
 
 This first-step bridge is intentionally narrow. It wires PyTorch device and
-stream management, allocation, synchronization, contiguous tensor copies, and
-shared ATen tensor metadata adapters to the Infini stack. General ATen operator
-coverage is left to later integration work.
+stream management, allocation, synchronization, contiguous tensor copies,
+shared ATen tensor metadata adapters, and `aten::add.Tensor` to the Infini
+stack. General ATen operator coverage is left to later integration work.
 
 The implementation follows PyTorch's documented out-of-tree backend path:
 `PrivateUse1` is renamed to `infini`, C++ kernels are registered through the
@@ -106,10 +107,12 @@ The initial implementation supports:
 - `torch.empty_strided(..., device="infini")`
 - contiguous `copy_` between CPU and Infini tensors
 - internal ATen-to-InfiniRT TensorView and InfiniOps execution-context adapters
+- same-dtype, same-device `torch.add(tensor, tensor)` through native InfiniOps
+  implementation index 0, including broadcasted and strided inputs
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
 device and stream-management operations it implements. Stream priorities,
 events, random-number generation, asynchronous memory and copy behavior, and
-general ATen operators are not exposed yet. This integration does not register
-an InfiniOps-backed ATen computational operator. Unsupported operations should
-fail clearly instead of silently falling back through CPU.
+other general ATen operators are not exposed yet. The initial tensor Add path
+requires `alpha == 1` and does not perform dtype promotion. Unsupported
+operations should fail clearly instead of silently falling back through CPU.

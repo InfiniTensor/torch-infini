@@ -22,7 +22,13 @@ infini::rt::TensorView::Strides to_strides(c10::IntArrayRef strides);
 
 infini::rt::TensorView to_tensor_view(const at::Tensor& tensor);
 
+infini::rt::TensorView to_expanded_tensor_view(
+    const at::Tensor& tensor,
+    c10::IntArrayRef sizes);
+
 ExecutionContext make_execution_context(infini::rt::runtime::Stream stream);
+
+ExecutionContext make_execution_context(c10::Device device);
 
 } // namespace torch_infini::infini_ops
 

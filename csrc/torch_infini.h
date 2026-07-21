@@ -66,6 +66,11 @@ at::Tensor empty_strided(
 
 at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking);
 
+at::Tensor add(
+    const at::Tensor& self,
+    const at::Tensor& other,
+    const at::Scalar& alpha);
+
 } // namespace torch_infini
 
 #endif // TORCH_INFINI_TORCH_INFINI_H_

@@ -176,3 +176,39 @@ def test_execution_context_uses_stream_and_native_implementation(
         "stream": stream_address,
         "implementation_index": 0,
     }
+
+
+def test_execution_context_uses_current_nondefault_stream(infini_ops_test_module):
+    stream = torch.infini.Stream()
+
+    with torch.infini.stream(stream):
+        metadata = infini_ops_test_module.current_execution_context_metadata(
+            str(stream.device)
+        )
+
+    assert metadata == {
+        "stream": stream.native_handle,
+        "implementation_index": 0,
+    }
+
+
+def test_add_tensor_supports_noncontiguous_inputs(infini_ops_test_module):
+    lhs_cpu = torch.empty_strided((2, 3), (1, 2), dtype=torch.float32)
+    rhs_cpu = torch.empty_strided((2, 3), (1, 2), dtype=torch.float32)
+    lhs_cpu.copy_(torch.arange(6, dtype=torch.float32).reshape(2, 3))
+    rhs_cpu.copy_(torch.full((2, 3), 2.5, dtype=torch.float32))
+    lhs = torch.empty_strided(
+        lhs_cpu.shape, lhs_cpu.stride(), dtype=lhs_cpu.dtype, device="infini"
+    )
+    rhs = torch.empty_strided(
+        rhs_cpu.shape, rhs_cpu.stride(), dtype=rhs_cpu.dtype, device="infini"
+    )
+    infini_ops_test_module.copy_storage_from_cpu(lhs, lhs_cpu)
+    infini_ops_test_module.copy_storage_from_cpu(rhs, rhs_cpu)
+
+    result = torch.add(lhs, rhs)
+
+    torch.infini.synchronize(result.device)
+    result_cpu = torch.empty(result.shape, dtype=result.dtype)
+    result_cpu.copy_(result)
+    torch.testing.assert_close(result_cpu, torch.add(lhs_cpu, rhs_cpu))
