@@ -20,10 +20,6 @@ rt::Event native_event(void* event) {
   return event;
 }
 
-rt::Stream native_stream(const c10::Stream& stream) {
-  return reinterpret_cast<rt::Stream>(get_native_stream_handle(stream));
-}
-
 } // namespace
 
 void destroy_event(void* event, c10::DeviceIndex device_index) noexcept {
@@ -59,7 +55,6 @@ void record_event(
       static_cast<int>(stream.device_index()));
 
   const c10::DeviceGuard guard{stream.device()};
-  const auto stream_handle = native_stream(stream);
   bool created = false;
   if (*event == nullptr) {
     rt::Event native{};
@@ -73,7 +68,10 @@ void record_event(
   }
 
   try {
-    check(rt::EventRecord(native_event(*event), stream_handle), "EventRecord");
+    submit_stream_work(stream, [&](rt::Stream stream_handle) {
+      check(
+          rt::EventRecord(native_event(*event), stream_handle), "EventRecord");
+    });
   } catch (...) {
     if (created) {
       (void)rt::EventDestroy(*event);
@@ -85,9 +83,11 @@ void record_event(
 
 void block_event(void* event, const c10::Stream& stream) {
   const c10::DeviceGuard guard{stream.device()};
-  check(
-      rt::StreamWaitEvent(native_stream(stream), native_event(event), 0),
-      "StreamWaitEvent");
+  submit_stream_work(stream, [&](rt::Stream stream_handle) {
+    check(
+        rt::StreamWaitEvent(stream_handle, native_event(event), 0),
+        "StreamWaitEvent");
+  });
 }
 
 bool query_event(void* event) {

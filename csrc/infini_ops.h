@@ -28,8 +28,6 @@ infini::rt::TensorView to_expanded_tensor_view(
 
 ExecutionContext make_execution_context(infini::rt::runtime::Stream stream);
 
-ExecutionContext make_execution_context(c10::Device device);
-
 } // namespace torch_infini::infini_ops
 
 #endif // TORCH_INFINI_INFINI_OPS_H_

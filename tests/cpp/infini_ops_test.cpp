@@ -4,8 +4,13 @@
 
 #include <c10/core/DeviceGuard.h>
 
+#include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <exception>
+#include <future>
 #include <string>
+#include <thread>
 
 #include "infini_ops.h"
 #include "torch_infini.h"
@@ -54,14 +59,83 @@ py::dict execution_context_metadata(std::uintptr_t stream_address) {
 }
 
 py::dict current_execution_context_metadata(const std::string& device_name) {
-  const auto context = torch_infini::infini_ops::make_execution_context(
-      c10::Device{device_name});
+  const c10::Device device{device_name};
+  const auto stream = torch_infini::get_current_stream(device);
+  const auto native_stream = reinterpret_cast<torch_infini::rt::Stream>(
+      torch_infini::get_native_stream_handle(stream));
+  const auto context =
+      torch_infini::infini_ops::make_execution_context(native_stream);
 
   py::dict metadata;
   metadata["stream"] =
       reinterpret_cast<std::uintptr_t>(context.handle.stream());
   metadata["implementation_index"] = context.config.implementation_index();
   return metadata;
+}
+
+bool stream_synchronize_waits_for_submission(const std::string& device_name) {
+  const c10::Device device{device_name};
+  const c10::DeviceGuard guard{device};
+  const auto stream = torch_infini::get_current_stream(device);
+
+  std::promise<void> submission_started;
+  auto submission_started_future = submission_started.get_future();
+  std::promise<void> release_submission;
+  auto release_submission_future = release_submission.get_future().share();
+  std::promise<void> synchronization_started;
+  auto synchronization_started_future = synchronization_started.get_future();
+  std::promise<void> synchronization_finished;
+  auto synchronization_finished_future = synchronization_finished.get_future();
+  std::atomic<bool> submission_started_signaled{false};
+  std::exception_ptr submission_error;
+  std::exception_ptr synchronization_error;
+  const auto signal_submission_started = [&] {
+    if (!submission_started_signaled.exchange(true)) {
+      submission_started.set_value();
+    }
+  };
+
+  std::thread submitter([&] {
+    try {
+      const c10::DeviceGuard thread_guard{device};
+      torch_infini::submit_stream_work(stream, [&](torch_infini::rt::Stream) {
+        signal_submission_started();
+        release_submission_future.wait();
+      });
+    } catch (...) {
+      submission_error = std::current_exception();
+      signal_submission_started();
+    }
+  });
+
+  submission_started_future.wait();
+  std::thread synchronizer([&] {
+    try {
+      const c10::DeviceGuard thread_guard{device};
+      synchronization_started.set_value();
+      torch_infini::synchronize_stream(stream);
+      synchronization_finished.set_value();
+    } catch (...) {
+      synchronization_error = std::current_exception();
+      synchronization_finished.set_value();
+    }
+  });
+
+  synchronization_started_future.wait();
+  const auto synchronized_while_submission_open =
+      synchronization_finished_future.wait_for(
+          std::chrono::milliseconds{500}) == std::future_status::ready;
+  release_submission.set_value();
+  submitter.join();
+  synchronizer.join();
+
+  if (submission_error != nullptr) {
+    std::rethrow_exception(submission_error);
+  }
+  if (synchronization_error != nullptr) {
+    std::rethrow_exception(synchronization_error);
+  }
+  return !synchronized_while_submission_open;
 }
 
 void copy_storage_from_cpu(at::Tensor destination, const at::Tensor& source) {
@@ -92,5 +166,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def(
       "current_execution_context_metadata",
       &current_execution_context_metadata);
+  m.def(
+      "stream_synchronize_waits_for_submission",
+      &stream_synchronize_waits_for_submission);
   m.def("copy_storage_from_cpu", &copy_storage_from_cpu);
 }

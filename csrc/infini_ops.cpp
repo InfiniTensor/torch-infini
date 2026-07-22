@@ -123,10 +123,4 @@ ExecutionContext make_execution_context(infini::rt::runtime::Stream stream) {
   return context;
 }
 
-ExecutionContext make_execution_context(c10::Device device) {
-  const auto stream = get_current_stream(device);
-  return make_execution_context(reinterpret_cast<infini::rt::runtime::Stream>(
-      get_native_stream_handle(stream)));
-}
-
 } // namespace torch_infini::infini_ops
