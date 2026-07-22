@@ -139,3 +139,18 @@ jobs:
           LD_LIBRARY_PATH: ${{ runner.temp }}/infiniops-install/lib:${{ runner.temp }}/infinirt-install/lib
           TORCH_INFINI_TEST_EXPECTED_BACKEND: cpu
         run: python -m pytest -q "$GITHUB_WORKSPACE/tests"
+      - name: Generate torch.cuda API gap report
+        working-directory: ${{ runner.temp }}
+        env:
+          LD_LIBRARY_PATH: ${{ runner.temp }}/infiniops-install/lib:${{ runner.temp }}/infinirt-install/lib
+        run: |
+          python "$GITHUB_WORKSPACE/tools/report_api_gaps.py" \
+            --profile "$GITHUB_WORKSPACE/tests/conformance/api_profile.json" \
+            --markdown "$RUNNER_TEMP/conformance/torch-cuda-gaps.md" \
+            --json "$RUNNER_TEMP/conformance/torch-cuda-gaps.json"
+      - name: Upload torch.cuda API gap report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: torch-cuda-api-gaps
+          path: ${{ runner.temp }}/conformance
+          if-no-files-found: error

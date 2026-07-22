@@ -22,7 +22,7 @@ jobs:
           ruff==0.15.21
       - name: Run Ruff
         run: |
-          ruff check setup.py torch_infini tests
-          ruff format --check setup.py torch_infini tests
+          ruff check setup.py torch_infini tests tools
+          ruff format --check setup.py torch_infini tests tools
       - name: Run clang-format
         run: clang-format --dry-run --Werror csrc/*.cpp csrc/*.h
