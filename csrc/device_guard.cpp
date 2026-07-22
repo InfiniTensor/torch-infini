@@ -71,6 +71,27 @@ class DeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
     return exchange_current_stream(stream);
   }
 
+  void destroyEvent(void* event, c10::DeviceIndex device_index)
+      const noexcept override {
+    destroy_event(event, device_index);
+  }
+
+  void record(
+      void** event,
+      const c10::Stream& stream,
+      c10::DeviceIndex device_index,
+      c10::EventFlag flag) const override {
+    record_event(event, stream, device_index, flag);
+  }
+
+  void block(void* event, const c10::Stream& stream) const override {
+    block_event(event, stream);
+  }
+
+  bool queryEvent(void* event) const override {
+    return query_event(event);
+  }
+
   void* getStreamNativeHandle(c10::Stream stream) const {
     return get_native_stream_handle(stream);
   }
@@ -87,8 +108,19 @@ class DeviceGuardImpl final : public c10::impl::DeviceGuardImplInterface {
     synchronize_stream(stream);
   }
 
+  void synchronizeEvent(void* event) const override {
+    synchronize_event(event);
+  }
+
   void synchronizeDevice(const c10::DeviceIndex device_index) const override {
     synchronize(device_index);
+  }
+
+  double elapsedTime(
+      void* start_event,
+      void* end_event,
+      c10::DeviceIndex device_index) const override {
+    return elapsed_time(start_event, end_event, device_index);
   }
 };
 

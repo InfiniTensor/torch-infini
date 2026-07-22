@@ -5,6 +5,7 @@
 #include <c10/core/Device.h>
 #include <c10/core/DeviceType.h>
 #include <c10/core/Stream.h>
+#include <c10/core/impl/DeviceGuardImplInterface.h>
 #include <infini/rt.h>
 #include <torch/library.h>
 
@@ -45,6 +46,20 @@ c10::Stream exchange_current_stream(c10::Stream stream);
 void* get_native_stream_handle(c10::Stream stream);
 bool query_stream(const c10::Stream& stream);
 void synchronize_stream(const c10::Stream& stream);
+
+void destroy_event(void* event, c10::DeviceIndex device_index) noexcept;
+void record_event(
+    void** event,
+    const c10::Stream& stream,
+    c10::DeviceIndex device_index,
+    c10::EventFlag flag);
+void block_event(void* event, const c10::Stream& stream);
+bool query_event(void* event);
+void synchronize_event(void* event);
+double elapsed_time(
+    void* start_event,
+    void* end_event,
+    c10::DeviceIndex device_index);
 
 c10::Allocator* get_allocator();
 

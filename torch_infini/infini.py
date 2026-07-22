@@ -47,6 +47,64 @@ def get_device_name(device: Any | None = None) -> str:
     return _C.get_device_name(_normalize_device_index(device))
 
 
+class Event(torch.Event):
+    def __new__(
+        cls,
+        *,
+        enable_timing: bool = False,
+        blocking: bool = False,
+        interprocess: bool = False,
+    ) -> Event:
+        if blocking:
+            raise NotImplementedError(
+                "torch.infini.Event does not support blocking=True"
+            )
+        if interprocess:
+            raise NotImplementedError(
+                "torch.infini.Event does not support interprocess=True"
+            )
+        result = super().__new__(
+            cls,
+            "infini",
+            enable_timing=enable_timing,
+        )
+        result._enable_timing = enable_timing
+        return result
+
+    def record(self, stream_obj: torch.Stream | None = None) -> None:
+        if stream_obj is None:
+            stream_obj = current_stream()
+        super().record(_check_stream(stream_obj))
+
+    def wait(self, stream_obj: torch.Stream | None = None) -> None:
+        if stream_obj is None:
+            stream_obj = current_stream()
+        super().wait(_check_stream(stream_obj))
+
+    def elapsed_time(self, end_event: Event) -> float:
+        if not isinstance(end_event, Event):
+            raise TypeError(f"expected an infini Event, got {type(end_event).__name__}")
+        if not self._enable_timing or not end_event._enable_timing:
+            raise ValueError(
+                "Both events must be created with argument 'enable_timing=True'."
+            )
+        if self.event_id == 0 or end_event.event_id == 0:
+            raise ValueError(
+                "Both events must be recorded before calculating elapsed time."
+            )
+        if self.device != end_event.device:
+            raise ValueError("Both events must be recorded on the same device.")
+        if not self.query() or not end_event.query():
+            raise RuntimeError(
+                "Both events must be completed before calculating elapsed time."
+            )
+        return _C._event_elapsed_time(
+            self.event_id,
+            end_event.event_id,
+            self.device.index,
+        )
+
+
 class Stream(torch.Stream):
     def __new__(
         cls,
@@ -85,6 +143,18 @@ class Stream(torch.Stream):
     def native_handle(self) -> int:
         return _C._stream_native_handle(self.stream_id, self.device_index)
 
+    def record_event(self, event: torch.Event | None = None) -> torch.Event:
+        if event is None:
+            event = Event()
+        _check_event(event).record(self)
+        return event
+
+    def wait_event(self, event: torch.Event) -> None:
+        _check_event(event).wait(self)
+
+    def wait_stream(self, stream_obj: torch.Stream) -> None:
+        self.wait_event(_check_stream(stream_obj).record_event())
+
 
 def _wrap_stream(stream_obj: torch.Stream) -> Stream:
     return Stream(
@@ -100,6 +170,14 @@ def _check_stream(stream_obj: torch.Stream) -> torch.Stream:
     if stream_obj.device.type != "infini":
         raise ValueError(f"expected an infini stream, got {stream_obj.device}")
     return stream_obj
+
+
+def _check_event(event_obj: torch.Event) -> torch.Event:
+    if not isinstance(event_obj, torch.Event):
+        raise TypeError(f"expected a torch.Event, got {type(event_obj).__name__}")
+    if event_obj.device.type != "infini":
+        raise ValueError(f"expected an infini event, got {event_obj.device}")
+    return event_obj
 
 
 def current_stream(device: Any | None = None) -> Stream:
@@ -146,6 +224,7 @@ class device(ContextDecorator):
 
 
 __all__ = [
+    "Event",
     "Stream",
     "current_device",
     "current_stream",
