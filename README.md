@@ -103,6 +103,8 @@ The initial implementation supports:
 - `torch.infini.default_stream()`
 - `torch.infini.set_stream(stream)`
 - `torch.infini.stream(stream)`
+- `torch.infini.Event()`
+- event record, query, synchronize, elapsed-time, and stream-wait operations
 - `torch.empty(..., device="infini")`
 - `torch.empty_strided(..., device="infini")`
 - contiguous `copy_` between CPU and Infini tensors
@@ -112,7 +114,11 @@ The initial implementation supports:
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
 device and stream-management operations it implements. Stream priorities,
-events, random-number generation, asynchronous memory and copy behavior, and
-other general ATen operators are not exposed yet. The initial tensor Add path
-requires `alpha == 1` and does not perform dtype promotion. Unsupported
-operations should fail clearly instead of silently falling back through CPU.
+random-number generation, asynchronous memory and copy behavior, and other
+general ATen operators are not exposed yet. InfiniRT does not currently expose
+the capabilities needed for blocking or interprocess events, so those event
+constructor options raise `NotImplementedError`. Event operations are validated
+with the InfiniRT CPU and NVIDIA backends; other backends require corresponding
+InfiniRT event support. The initial tensor Add path requires `alpha == 1` and
+does not perform dtype promotion. Unsupported operations should fail clearly
+instead of silently falling back through CPU.

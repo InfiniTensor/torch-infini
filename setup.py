@@ -100,6 +100,7 @@ setup(
                 "csrc/copy.cpp",
                 "csrc/device_guard.cpp",
                 "csrc/empty.cpp",
+                "csrc/event.cpp",
                 "csrc/infini_ops.cpp",
                 "csrc/init.cpp",
                 "csrc/runtime.cpp",
