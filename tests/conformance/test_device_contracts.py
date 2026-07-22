@@ -3,6 +3,20 @@ import pytest
 from .backends import compare_observations
 
 
+CONTRACT_ID = "device"
+COVERED_API = frozenset(
+    {
+        "current_device",
+        "device",
+        "device_count",
+        "get_device_name",
+        "is_available",
+        "set_device",
+        "synchronize",
+    }
+)
+
+
 def _observe_device_module(backend):
     module = backend.module
     count = module.device_count()
@@ -74,7 +88,20 @@ def test_device_context_selects_and_restores_another_device(
         module.set_device(initial)
 
 
-def test_explicit_synchronize_preserves_current_device(accelerator_backend):
+def test_explicit_synchronize_current_device_preserves_current_device(
+    accelerator_backend,
+):
+    module = accelerator_backend.module
+    initial = module.current_device()
+
+    module.synchronize(initial)
+
+    assert module.current_device() == initial
+
+
+def test_explicit_synchronize_another_device_preserves_current_device(
+    accelerator_backend,
+):
     module = accelerator_backend.module
     count = module.device_count()
     if count < 2:

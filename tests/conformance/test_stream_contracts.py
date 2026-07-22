@@ -1,8 +1,22 @@
 import threading
 
 import pytest
+import torch
 
 from .backends import compare_observations
+from .workloads import assert_matches_cpu, make_add_input
+
+
+CONTRACT_ID = "stream"
+COVERED_API = frozenset(
+    {
+        "Stream",
+        "current_stream",
+        "default_stream",
+        "set_stream",
+        "stream",
+    }
+)
 
 
 def _observe_streams(backend):
@@ -67,11 +81,17 @@ def test_stream_context_restores_after_exception(accelerator_backend):
 
 
 def test_stream_query_and_synchronize(accelerator_backend):
-    stream = accelerator_backend.module.Stream()
+    module = accelerator_backend.module
+    stream = module.Stream()
+    source, device_source = make_add_input(accelerator_backend)
+
+    with module.stream(stream):
+        result = torch.add(device_source, device_source)
 
     assert isinstance(stream.query(), bool)
     stream.synchronize()
     assert stream.query()
+    assert_matches_cpu(result, source * 2)
 
 
 def test_current_stream_is_thread_local(accelerator_backend):
