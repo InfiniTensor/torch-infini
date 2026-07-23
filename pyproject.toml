@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69", "wheel", "torch"]
+requires = ["setuptools>=69", "wheel", "torch>=2.12,<2.14"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,11 +7,14 @@ name = "torch-infini"
 version = "0.1.0"
 description = "PyTorch PrivateUse1 plugin for the Infini accelerator stack"
 readme = "README.md"
-requires-python = ">=3.9"
-dependencies = ["torch"]
+requires-python = ">=3.10,<3.13"
+dependencies = ["torch>=2.12,<2.14"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
 ]
 
@@ -19,7 +22,9 @@ classifiers = [
 dev = [
     "clang-format==19.1.4",
     "pytest",
+    "pyyaml>=6",
     "ruff==0.15.21",
+    "tomli>=1; python_version < '3.11'",
 ]
 
 [tool.setuptools]

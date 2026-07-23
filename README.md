@@ -78,6 +78,16 @@ headers. For those installations, set `CUDA_INCLUDE_DIRS` when CUDA headers are
 outside the standard toolkit paths. `torch-infini` does not otherwise depend on
 CUDA; InfiniRT should eventually export any required transitive include paths.
 
+## Compatibility
+
+Source-build compatibility is tested for every combination of Python 3.10,
+3.11, and 3.12 with PyTorch 2.12 and 2.13. The tested native dependencies are
+InfiniRT commit `95c70080f9551e61241110497d163dfcdf9dc7e7` and InfiniOps commit
+`296271487beb594a248fd463e5fff14f7ab74293`.
+
+Native wheels are not guaranteed to work across PyTorch minor versions. Build
+the wheel with the PyTorch minor version that will be used at runtime.
+
 ## Runtime backend
 
 torch-infini automatically uses an accelerator backend compiled into InfiniRT
