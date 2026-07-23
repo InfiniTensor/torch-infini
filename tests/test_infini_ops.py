@@ -198,6 +198,12 @@ def test_stream_synchronize_waits_for_in_flight_submission(
     assert infini_ops_test_module.stream_synchronize_waits_for_submission("infini:0")
 
 
+def test_stream_submission_waits_for_synchronous_work(infini_ops_test_module):
+    assert infini_ops_test_module.stream_submission_waits_for_synchronous_work(
+        "infini:0"
+    )
+
+
 def test_add_tensor_supports_noncontiguous_inputs(infini_ops_test_module):
     lhs_cpu = torch.empty_strided((2, 3), (1, 2), dtype=torch.float32)
     rhs_cpu = torch.empty_strided((2, 3), (1, 2), dtype=torch.float32)

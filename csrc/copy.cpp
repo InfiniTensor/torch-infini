@@ -39,6 +39,46 @@ void check_copy_shape(const at::Tensor& dst, const at::Tensor& src) {
       "infini copy_ currently only supports contiguous tensors");
 }
 
+bool supports_async_memcpy(infini::rt::Device::Type device_type) {
+  using DeviceType = infini::rt::Device::Type;
+
+  // InfiniRT has no portable unsupported status, so use its pinned capability
+  // table instead of treating every asynchronous copy error as unsupported.
+  switch (device_type) {
+    case DeviceType::kNvidia:
+    case DeviceType::kCambricon:
+    case DeviceType::kAscend:
+    case DeviceType::kMetax:
+    case DeviceType::kMoore:
+    case DeviceType::kIluvatar:
+    case DeviceType::kHygon:
+      return true;
+    case DeviceType::kCpu:
+    default:
+      return false;
+  }
+}
+
+void copy_on_stream(
+    void* dst,
+    const void* src,
+    std::size_t nbytes,
+    rt::MemcpyKind kind,
+    const c10::Stream& stream,
+    const char* async_call,
+    const char* sync_call) {
+  if (!supports_async_memcpy(infini::rt::runtime_device_type())) {
+    run_synchronous_stream_work(
+        stream, [&] { check(rt::Memcpy(dst, src, nbytes, kind), sync_call); });
+    return;
+  }
+
+  submit_stream_work(stream, [&](rt::Stream native_stream) {
+    check(rt::MemcpyAsync(dst, src, nbytes, kind, native_stream), async_call);
+  });
+  synchronize_stream(stream);
+}
+
 } // namespace
 
 at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
@@ -52,18 +92,28 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
 
   if (is_infini(self) && is_cpu(src)) {
     const c10::DeviceGuard guard{self.device()};
-    check(
-        rt::Memcpy(
-            self.data_ptr(), src.data_ptr(), nbytes, rt::kMemcpyHostToDevice),
+    const auto stream = get_current_stream(self.device());
+    copy_on_stream(
+        self.data_ptr(),
+        src.data_ptr(),
+        nbytes,
+        rt::kMemcpyHostToDevice,
+        stream,
+        "MemcpyAsync(HostToDevice)",
         "Memcpy(HostToDevice)");
     return self;
   }
 
   if (is_cpu(self) && is_infini(src)) {
     const c10::DeviceGuard guard{src.device()};
-    check(
-        rt::Memcpy(
-            self.data_ptr(), src.data_ptr(), nbytes, rt::kMemcpyDeviceToHost),
+    const auto stream = get_current_stream(src.device());
+    copy_on_stream(
+        self.data_ptr(),
+        src.data_ptr(),
+        nbytes,
+        rt::kMemcpyDeviceToHost,
+        stream,
+        "MemcpyAsync(DeviceToHost)",
         "Memcpy(DeviceToHost)");
     return self;
   }
@@ -73,9 +123,14 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
         self.device().index() == src.device().index(),
         "infini copy_ currently only supports same-device copies");
     const c10::DeviceGuard guard{self.device()};
-    check(
-        rt::Memcpy(
-            self.data_ptr(), src.data_ptr(), nbytes, rt::kMemcpyDeviceToDevice),
+    const auto stream = get_current_stream(self.device());
+    copy_on_stream(
+        self.data_ptr(),
+        src.data_ptr(),
+        nbytes,
+        rt::kMemcpyDeviceToDevice,
+        stream,
+        "MemcpyAsync(DeviceToDevice)",
         "Memcpy(DeviceToDevice)");
     return self;
   }
