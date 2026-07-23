@@ -26,6 +26,22 @@ jobs:
             python_version: "3.10.18"
             pytorch_version: "2.12.0+cpu"
             artifact_name: torch-cuda-api-gaps-python-3.10-pytorch-2.12
+          - job_name: CPU (Python 3.10, PyTorch 2.13)
+            python_version: "3.10.18"
+            pytorch_version: "2.13.0+cpu"
+            artifact_name: torch-cuda-api-gaps-python-3.10-pytorch-2.13
+          - job_name: CPU (Python 3.11, PyTorch 2.12)
+            python_version: "3.11.13"
+            pytorch_version: "2.12.0+cpu"
+            artifact_name: torch-cuda-api-gaps-python-3.11-pytorch-2.12
+          - job_name: CPU (Python 3.11, PyTorch 2.13)
+            python_version: "3.11.13"
+            pytorch_version: "2.13.0+cpu"
+            artifact_name: torch-cuda-api-gaps-python-3.11-pytorch-2.13
+          - job_name: CPU (Python 3.12, PyTorch 2.12)
+            python_version: "3.12.13"
+            pytorch_version: "2.12.0+cpu"
+            artifact_name: torch-cuda-api-gaps-python-3.12-pytorch-2.12
     env:
       INFINIRT_COMMIT: 95c70080f9551e61241110497d163dfcdf9dc7e7
       INFINIOPS_COMMIT: 296271487beb594a248fd463e5fff14f7ab74293
@@ -48,7 +64,9 @@ jobs:
             ninja==1.11.1.4 \
             numpy==2.2.6 \
             pytest==8.4.1 \
+            pyyaml==6.0.2 \
             setuptools==80.9.0 \
+            "tomli==2.2.1; python_version < '3.11'" \
             wheel==0.45.1
           python -m pip install \
             --index-url https://download.pytorch.org/whl/cpu \
