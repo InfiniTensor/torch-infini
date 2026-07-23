@@ -123,3 +123,31 @@ def test_stream_query_and_synchronize():
     assert isinstance(stream.query(), bool)
     stream.synchronize()
     assert stream.query()
+
+
+def test_stream_query_is_ready_after_synchronizing_wait():
+    source = torch.arange(262144, dtype=torch.float32)
+    device_source = torch.empty_like(source, device="infini")
+    device_source.copy_(source)
+    producer = torch.infini.Stream()
+    consumer = torch.infini.Stream()
+
+    with torch.infini.stream(producer):
+        produced = torch.add(device_source, device_source)
+    consumer.wait_stream(producer)
+    with torch.infini.stream(consumer):
+        result = torch.add(produced, device_source)
+    consumer.synchronize()
+
+    assert consumer.query()
+    actual = torch.empty_like(source)
+    actual.copy_(result)
+    torch.testing.assert_close(actual, source * 3)
+
+
+def test_stream_query_rejects_exposed_native_handle():
+    stream = torch.infini.Stream()
+    _ = stream.native_handle
+
+    with pytest.raises(RuntimeError, match="InfiniRT does not expose StreamQuery"):
+        stream.query()

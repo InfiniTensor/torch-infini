@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <cstddef>
+#include <functional>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -21,6 +22,8 @@ struct StreamEntry {
   rt::Event query_event{};
   bool query_event_created{false};
   bool query_event_recorded{false};
+  bool known_complete{true};
+  bool native_handle_exposed{false};
   bool owned{false};
 };
 
@@ -102,7 +105,8 @@ class StreamRegistry {
       const std::lock_guard<std::mutex> lock{mutex_};
       const auto [iterator, inserted] =
           streams_[static_cast<std::size_t>(device.index())].emplace(
-              stream_id, StreamEntry{native_stream, {}, false, false, true});
+              stream_id,
+              StreamEntry{native_stream, {}, false, false, true, false, true});
       (void)iterator;
       TORCH_CHECK(inserted, "duplicate infini stream ID ", stream_id);
     } catch (...) {
@@ -121,13 +125,49 @@ class StreamRegistry {
   NativeStream native_stream_for_work(const c10::Stream& stream) {
     const std::lock_guard<std::mutex> lock{mutex_};
     auto& entry = checked_entry(stream);
-    entry.query_event_recorded = false;
+    mark_work_pending(entry);
+    entry.native_handle_exposed = true;
     return entry.stream;
+  }
+
+  void submit(
+      const c10::Stream& stream,
+      const std::function<void(NativeStream)>& submit) {
+    const std::lock_guard<std::mutex> lock{mutex_};
+    auto& entry = checked_entry(stream);
+    mark_work_pending(entry);
+    submit(entry.stream);
+  }
+
+  void synchronize(const c10::Stream& stream) {
+    const std::lock_guard<std::mutex> lock{mutex_};
+    auto& entry = checked_entry(stream);
+    check(rt::StreamSynchronize(entry.stream), "StreamSynchronize");
+    entry.known_complete = true;
   }
 
   bool query(const c10::Stream& stream) {
     const std::lock_guard<std::mutex> lock{mutex_};
     auto& entry = checked_entry(stream);
+    TORCH_CHECK(
+        !entry.native_handle_exposed,
+        "infini stream query is unavailable after its native handle has been "
+        "exposed because InfiniRT does not expose StreamQuery");
+    if (entry.known_complete) {
+      return true;
+    }
+    record_query_event(entry);
+    entry.known_complete = rt::EventQuery(entry.query_event) == rt::kSuccess;
+    return entry.known_complete;
+  }
+
+ private:
+  static void mark_work_pending(StreamEntry& entry) {
+    entry.query_event_recorded = false;
+    entry.known_complete = false;
+  }
+
+  void record_query_event(StreamEntry& entry) {
     if (!entry.query_event_created) {
       check(rt::EventCreate(&entry.query_event), "EventCreate");
       entry.query_event_created = true;
@@ -136,10 +176,8 @@ class StreamRegistry {
       check(rt::EventRecord(entry.query_event, entry.stream), "EventRecord");
       entry.query_event_recorded = true;
     }
-    return rt::EventQuery(entry.query_event) == rt::kSuccess;
   }
 
- private:
   StreamEntry& checked_entry(const c10::Stream& stream) {
     TORCH_CHECK(
         stream.device_type() == kDeviceType,
@@ -227,6 +265,14 @@ void* get_native_stream_handle(c10::Stream stream) {
       stream_registry().native_stream_for_work(stream));
 }
 
+void submit_stream_work(
+    const c10::Stream& stream,
+    const std::function<void(rt::Stream)>& submit) {
+  const c10::DeviceGuard guard{stream.device()};
+  ensure_runtime_backend_for_current_thread();
+  stream_registry().submit(stream, submit);
+}
+
 bool query_stream(const c10::Stream& stream) {
   const c10::DeviceGuard guard{stream.device()};
   ensure_runtime_backend_for_current_thread();
@@ -235,7 +281,8 @@ bool query_stream(const c10::Stream& stream) {
 
 void synchronize_stream(const c10::Stream& stream) {
   const c10::DeviceGuard guard{stream.device()};
-  check(rt::StreamSynchronize(native_stream(stream)), "StreamSynchronize");
+  ensure_runtime_backend_for_current_thread();
+  stream_registry().synchronize(stream);
 }
 
 } // namespace torch_infini

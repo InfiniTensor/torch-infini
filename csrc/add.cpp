@@ -79,10 +79,12 @@ at::Tensor add(
   const auto other_view =
       infini_ops::to_expanded_tensor_view(other, output_size);
   const auto output_view = infini_ops::to_tensor_view(output);
-  const auto context = infini_ops::make_execution_context(self.device());
-
-  infini::ops::Add::Call(
-      context.handle, context.config, self_view, other_view, output_view);
+  const auto stream = get_current_stream(self.device());
+  submit_stream_work(stream, [&](rt::Stream native_stream) {
+    const auto context = infini_ops::make_execution_context(native_stream);
+    infini::ops::Add::Call(
+        context.handle, context.config, self_view, other_view, output_view);
+  });
   return output;
 }
 

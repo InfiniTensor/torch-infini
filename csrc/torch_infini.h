@@ -10,6 +10,7 @@
 #include <torch/library.h>
 
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <string>
 
@@ -44,6 +45,9 @@ c10::Stream get_stream_from_global_pool(
     bool is_high_priority);
 c10::Stream exchange_current_stream(c10::Stream stream);
 void* get_native_stream_handle(c10::Stream stream);
+void submit_stream_work(
+    const c10::Stream& stream,
+    const std::function<void(rt::Stream)>& submit);
 bool query_stream(const c10::Stream& stream);
 void synchronize_stream(const c10::Stream& stream);
 
