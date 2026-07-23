@@ -88,6 +88,38 @@ support so the fallback is always available. InfiniRT stores its selection per
 thread, so torch-infini binds the selected backend whenever a thread enters a
 runtime operation.
 
+## Conformance testing
+
+The required conformance suite checks the supported `torch.infini` API and runs
+backend-neutral device, stream, and event contracts:
+
+```bash
+python -m pytest -q tests/conformance
+```
+
+These tests gate the capabilities classified as required in
+`tests/conformance/api_profile.json`. CUDA cases run when CUDA is available and
+skip otherwise. Infini cases always run through the automatically selected
+InfiniRT backend, including the CPU fallback.
+
+The full `torch.cuda` API surface is tracked by an advisory report:
+
+```bash
+python tools/report_api_gaps.py \
+  --profile tests/conformance/api_profile.json \
+  --markdown build/conformance/torch-cuda-gaps.md \
+  --json build/conformance/torch-cuda-gaps.json
+```
+
+The command records required, planned, excluded, and unclassified symbols in
+both Markdown and JSON. Compatibility gaps do not make the command fail, but an
+invalid profile or a report-generation failure does.
+
+CUDA is a behavioral reference rather than the specification, so the contracts
+compare stable state transitions instead of hardware-specific values. Future
+operator conformance work will use CPU execution as the numerical oracle and
+CUDA as an additional accelerator reference.
+
 ## Scope
 
 The initial implementation supports:

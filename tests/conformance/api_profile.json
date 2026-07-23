@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "reference_module": "torch.cuda",
+  "target_module": "torch.infini",
+  "symbols": {
+    "Event": {
+      "status": "required",
+      "kind": "class",
+      "signature": "best_effort",
+      "contracts": [
+        "event"
+      ]
+    },
+    "Stream": {
+      "status": "required",
+      "kind": "class",
+      "signature": "best_effort",
+      "contracts": [
+        "stream"
+      ]
+    },
+    "current_device": {
+      "status": "required",
+      "kind": "function",
+      "signature": "strict",
+      "contracts": [
+        "device"
+      ]
+    },
+    "current_stream": {
+      "status": "required",
+      "kind": "function",
+      "signature": "strict",
+      "contracts": [
+        "stream"
+      ]
+    },
+    "default_stream": {
+      "status": "required",
+      "kind": "function",
+      "signature": "strict",
+      "contracts": [
+        "stream"
+      ]
+    },
+    "device": {
+      "status": "required",
+      "kind": "class",
+      "signature": "best_effort",
+      "contracts": [
+        "device"
+      ]
+    },
+    "device_count": {
+      "status": "required",
+      "kind": "function",
+      "signature": "strict",
+      "contracts": [
+        "device"
+      ]
+    },
+    "get_backend": {
+      "status": "excluded",
+      "kind": "function",
+      "signature": "none",
+      "reason": "Backend selection is automatic and is not part of the public device module."
+    },
+    "get_device_name": {
+      "status": "required",
+      "kind": "function",
+      "signature": "strict",
+      "contracts": [
+        "device"
+      ]
+    },
+    "init": {
+      "status": "excluded",
+      "kind": "function",
+      "signature": "none",
+      "reason": "Torch-infini selects the InfiniRT backend automatically and does not expose explicit initialization."
+    },
+    "is_available": {
+      "status": "required",
+      "kind": "function",
+      "signature": "strict",
+      "contracts": [
+        "device"
+      ]
+    },
+    "is_initialized": {
+      "status": "excluded",
+      "kind": "function",
+      "signature": "none",
+      "reason": "Torch-infini does not expose a separate initialization state."
+    },
+    "manual_seed": {
+      "status": "planned",
+      "kind": "function",
+      "signature": "none",
+      "reason": "Random-number generation is not implemented yet."
+    },
+    "manual_seed_all": {
+      "status": "planned",
+      "kind": "function",
+      "signature": "none",
+      "reason": "Random-number generation is not implemented yet."
+    },
+    "set_device": {
+      "status": "required",
+      "kind": "function",
+      "signature": "strict",
+      "contracts": [
+        "device"
+      ]
+    },
+    "set_stream": {
+      "status": "required",
+      "kind": "function",
+      "signature": "best_effort",
+      "contracts": [
+        "stream"
+      ]
+    },
+    "stream": {
+      "status": "required",
+      "kind": "function",
+      "signature": "best_effort",
+      "contracts": [
+        "stream"
+      ]
+    },
+    "synchronize": {
+      "status": "required",
+      "kind": "function",
+      "signature": "strict",
+      "contracts": [
+        "device"
+      ]
+    }
+  }
+}

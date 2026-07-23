@@ -27,7 +27,7 @@ packages = ["torch_infini"]
 
 [tool.ruff]
 line-length = 88
-src = ["torch_infini", "tests"]
+src = ["torch_infini", "tests", "tools"]
 exclude = [
     "build",
     "dist",
