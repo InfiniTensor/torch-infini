@@ -151,3 +151,54 @@ def test_stream_query_rejects_exposed_native_handle():
 
     with pytest.raises(RuntimeError, match="InfiniRT does not expose StreamQuery"):
         stream.query()
+
+
+@pytest.mark.parametrize("non_blocking", [False, True])
+def test_copy_from_cpu_waits_for_current_nondefault_stream(non_blocking):
+    source = torch.arange(262144, dtype=torch.float32)
+    device_source = torch.empty_like(source, device="infini")
+    device_source.copy_(torch.ones_like(source))
+    stream = torch.infini.Stream()
+
+    with torch.infini.stream(stream):
+        destination = torch.add(device_source, device_source)
+        destination.copy_(source, non_blocking=non_blocking)
+
+    assert stream.query()
+    actual = torch.empty_like(source)
+    actual.copy_(destination)
+    torch.testing.assert_close(actual, source)
+
+
+@pytest.mark.parametrize("non_blocking", [False, True])
+def test_copy_to_cpu_waits_for_current_nondefault_stream(non_blocking):
+    source = torch.arange(262144, dtype=torch.float32)
+    device_source = torch.empty_like(source, device="infini")
+    device_source.copy_(source)
+    stream = torch.infini.Stream()
+    actual = torch.empty_like(source)
+
+    with torch.infini.stream(stream):
+        pending = torch.add(device_source, device_source)
+        actual.copy_(pending, non_blocking=non_blocking)
+
+    assert stream.query()
+    torch.testing.assert_close(actual, source * 2)
+
+
+@pytest.mark.parametrize("non_blocking", [False, True])
+def test_same_device_copy_waits_for_current_nondefault_stream(non_blocking):
+    source = torch.arange(262144, dtype=torch.float32)
+    device_source = torch.empty_like(source, device="infini")
+    device_source.copy_(source)
+    stream = torch.infini.Stream()
+
+    with torch.infini.stream(stream):
+        pending = torch.add(device_source, device_source)
+        destination = torch.empty_like(pending)
+        destination.copy_(pending, non_blocking=non_blocking)
+
+    assert stream.query()
+    actual = torch.empty_like(source)
+    actual.copy_(destination)
+    torch.testing.assert_close(actual, source * 2)

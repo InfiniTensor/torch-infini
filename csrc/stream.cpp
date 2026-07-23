@@ -139,6 +139,16 @@ class StreamRegistry {
     submit(entry.stream);
   }
 
+  void run_synchronous(
+      const c10::Stream& stream,
+      const std::function<void()>& work) {
+    const std::lock_guard<std::mutex> lock{mutex_};
+    auto& entry = checked_entry(stream);
+    check(rt::StreamSynchronize(entry.stream), "StreamSynchronize");
+    entry.known_complete = true;
+    work();
+  }
+
   void synchronize(const c10::Stream& stream) {
     const std::lock_guard<std::mutex> lock{mutex_};
     auto& entry = checked_entry(stream);
@@ -271,6 +281,14 @@ void submit_stream_work(
   const c10::DeviceGuard guard{stream.device()};
   ensure_runtime_backend_for_current_thread();
   stream_registry().submit(stream, submit);
+}
+
+void run_synchronous_stream_work(
+    const c10::Stream& stream,
+    const std::function<void()>& work) {
+  const c10::DeviceGuard guard{stream.device()};
+  ensure_runtime_backend_for_current_thread();
+  stream_registry().run_synchronous(stream, work);
 }
 
 bool query_stream(const c10::Stream& stream) {

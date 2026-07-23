@@ -138,6 +138,74 @@ bool stream_synchronize_waits_for_submission(const std::string& device_name) {
   return !synchronized_while_submission_open;
 }
 
+bool stream_submission_waits_for_synchronous_work(
+    const std::string& device_name) {
+  const c10::Device device{device_name};
+  const c10::DeviceGuard guard{device};
+  const auto stream = torch_infini::get_current_stream(device);
+
+  std::promise<void> synchronous_work_started;
+  auto synchronous_work_started_future = synchronous_work_started.get_future();
+  std::promise<void> release_synchronous_work;
+  auto release_synchronous_work_future =
+      release_synchronous_work.get_future().share();
+  std::promise<void> submission_started;
+  auto submission_started_future = submission_started.get_future();
+  std::promise<void> submission_finished;
+  auto submission_finished_future = submission_finished.get_future();
+  std::atomic<bool> synchronous_work_started_signaled{false};
+  std::exception_ptr synchronous_work_error;
+  std::exception_ptr submission_error;
+  const auto signal_synchronous_work_started = [&] {
+    if (!synchronous_work_started_signaled.exchange(true)) {
+      synchronous_work_started.set_value();
+    }
+  };
+
+  std::thread synchronous_worker([&] {
+    try {
+      const c10::DeviceGuard thread_guard{device};
+      torch_infini::run_synchronous_stream_work(stream, [&] {
+        signal_synchronous_work_started();
+        release_synchronous_work_future.wait();
+      });
+    } catch (...) {
+      synchronous_work_error = std::current_exception();
+      signal_synchronous_work_started();
+    }
+  });
+
+  synchronous_work_started_future.wait();
+  std::thread submitter([&] {
+    try {
+      const c10::DeviceGuard thread_guard{device};
+      submission_started.set_value();
+      torch_infini::submit_stream_work(stream, [](torch_infini::rt::Stream) {});
+      submission_finished.set_value();
+    } catch (...) {
+      submission_error = std::current_exception();
+      submission_finished.set_value();
+    }
+  });
+
+  submission_started_future.wait();
+  const auto submitted_while_synchronous_work_open =
+      submission_finished_future.wait_for(std::chrono::milliseconds{500}) ==
+      std::future_status::ready;
+  release_synchronous_work.set_value();
+  synchronous_worker.join();
+  submitter.join();
+  torch_infini::synchronize_stream(stream);
+
+  if (synchronous_work_error != nullptr) {
+    std::rethrow_exception(synchronous_work_error);
+  }
+  if (submission_error != nullptr) {
+    std::rethrow_exception(submission_error);
+  }
+  return !submitted_while_synchronous_work_open;
+}
+
 void copy_storage_from_cpu(at::Tensor destination, const at::Tensor& source) {
   TORCH_CHECK(
       destination.device().type() == torch_infini::kDeviceType,
@@ -169,5 +237,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def(
       "stream_synchronize_waits_for_submission",
       &stream_synchronize_waits_for_submission);
+  m.def(
+      "stream_submission_waits_for_synchronous_work",
+      &stream_submission_waits_for_synchronous_work);
   m.def("copy_storage_from_cpu", &copy_storage_from_cpu);
 }

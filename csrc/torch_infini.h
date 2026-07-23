@@ -48,6 +48,9 @@ void* get_native_stream_handle(c10::Stream stream);
 void submit_stream_work(
     const c10::Stream& stream,
     const std::function<void(rt::Stream)>& submit);
+void run_synchronous_stream_work(
+    const c10::Stream& stream,
+    const std::function<void()>& work);
 bool query_stream(const c10::Stream& stream);
 void synchronize_stream(const c10::Stream& stream);
 
