@@ -20,9 +20,10 @@ torch.testing.assert_close(out, src + src)
 ```
 
 This first-step bridge is intentionally narrow. It wires PyTorch device and
-stream management, allocation, synchronization, contiguous tensor copies,
-shared ATen tensor metadata adapters, and `aten::add.Tensor` to the Infini
-stack. General ATen operator coverage is left to later integration work.
+stream management, device and pinned-host allocation, synchronization,
+contiguous tensor copies, shared ATen tensor metadata adapters, and
+`aten::add.Tensor` to the Infini stack. General ATen operator coverage is left
+to later integration work.
 
 The implementation follows PyTorch's documented out-of-tree backend path:
 `PrivateUse1` is renamed to `infini`, C++ kernels are registered through the
@@ -139,15 +140,16 @@ The initial implementation supports:
 - event record, query, synchronize, elapsed-time, and stream-wait operations
 - `torch.empty(..., device="infini")`
 - `torch.empty_strided(..., device="infini")`
-- contiguous `copy_` between CPU and Infini tensors
+- `Tensor.pin_memory("infini")` and `Storage.pin_memory("infini")`
+- synchronous contiguous `copy_` between CPU and Infini tensors
 - internal ATen-to-InfiniRT TensorView and InfiniOps execution-context adapters
 - same-dtype, same-device `torch.add(tensor, tensor)` through native InfiniOps
   implementation index 0, including broadcasted and strided inputs
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
 device and stream-management operations it implements. Stream priorities,
-random-number generation, asynchronous memory and copy behavior, and other
-general ATen operators are not exposed yet. InfiniRT does not currently expose
+random-number generation, non-blocking copy lifetimes, and other general ATen
+operators are not exposed yet. InfiniRT does not currently expose
 the capabilities needed for blocking or interprocess events, so those event
 constructor options raise `NotImplementedError`. Event operations are validated
 with the InfiniRT CPU and NVIDIA backends; other backends require corresponding
