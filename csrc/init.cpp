@@ -7,6 +7,7 @@
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   torch_infini::register_backend();
+  torch_infini::register_privateuse1_hooks();
 
   m.def("_runtime_backend_name", &torch_infini::runtime_backend_name);
   m.def("is_available", &torch_infini::is_available);

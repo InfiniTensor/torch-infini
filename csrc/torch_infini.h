@@ -69,6 +69,10 @@ double elapsed_time(
     c10::DeviceIndex device_index);
 
 c10::Allocator* get_allocator();
+c10::Allocator* get_host_allocator();
+bool is_pinned_ptr(const void* data);
+
+void register_privateuse1_hooks();
 
 at::Tensor empty(
     c10::SymIntArrayRef size,

@@ -101,6 +101,8 @@ setup(
                 "csrc/device_guard.cpp",
                 "csrc/empty.cpp",
                 "csrc/event.cpp",
+                "csrc/hooks.cpp",
+                "csrc/host_allocator.cpp",
                 "csrc/infini_ops.cpp",
                 "csrc/init.cpp",
                 "csrc/runtime.cpp",
