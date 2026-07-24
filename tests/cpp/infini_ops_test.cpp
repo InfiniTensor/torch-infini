@@ -254,6 +254,26 @@ void copy_storage_from_cpu(at::Tensor destination, const at::Tensor& source) {
       "Memcpy(HostToDevice)");
 }
 
+void copy_storage_to_cpu(at::Tensor destination, const at::Tensor& source) {
+  TORCH_CHECK(
+      destination.device().is_cpu(), "destination must be a CPU tensor");
+  TORCH_CHECK(
+      source.device().type() == torch_infini::kDeviceType,
+      "source must be an infini tensor");
+  TORCH_CHECK(
+      destination.storage().nbytes() == source.storage().nbytes(),
+      "source and destination storage sizes must match");
+
+  const c10::DeviceGuard guard{source.device()};
+  torch_infini::check(
+      torch_infini::rt::Memcpy(
+          destination.data_ptr(),
+          source.data_ptr(),
+          source.storage().nbytes(),
+          torch_infini::rt::kMemcpyDeviceToHost),
+      "Memcpy(DeviceToHost)");
+}
+
 } // namespace
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
@@ -272,4 +292,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
       "stream_submission_waits_for_synchronous_work",
       &stream_submission_waits_for_synchronous_work);
   m.def("copy_storage_from_cpu", &copy_storage_from_cpu);
+  m.def("copy_storage_to_cpu", &copy_storage_to_cpu);
 }

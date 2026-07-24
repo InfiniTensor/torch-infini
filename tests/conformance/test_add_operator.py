@@ -7,11 +7,9 @@ from .operator_oracle import (
     StorageCopier,
     assert_operator_matches_cpu,
     assert_tensor_matches_cpu,
-    assert_tensor_values_match,
     copy_cpu_tensor,
     copy_strided_cpu_tensor,
     invoke,
-    tensor_metadata,
 )
 
 
@@ -89,6 +87,19 @@ def _gapped_strided_inputs(
     return lhs, rhs
 
 
+def _expanded_inputs(
+    device: str,
+    copy_storage_from_cpu: StorageCopier | None = None,
+) -> tuple[torch.Tensor, ...]:
+    lhs = torch.arange(3, dtype=torch.float32).reshape(1, 3).expand(4, 3)
+    rhs = torch.linspace(-1.0, 1.0, steps=3).reshape(1, 3).expand(4, 3)
+    assert lhs.stride() == rhs.stride() == (0, 1)
+    return (
+        copy_strided_cpu_tensor(lhs, device, copy_storage_from_cpu),
+        copy_strided_cpu_tensor(rhs, device, copy_storage_from_cpu),
+    )
+
+
 def _int32_inputs(
     device: str,
     _copy_storage_from_cpu: StorageCopier | None = None,
@@ -142,6 +153,19 @@ def test_add_tensor_gapped_strides_match_cpu_oracle(infini_ops_test_module) -> N
     )
 
 
+def test_add_tensor_expanded_strides_match_cpu_oracle(infini_ops_test_module) -> None:
+    case = OperatorCase(
+        "expanded-strided-float32",
+        torch.add,
+        _expanded_inputs,
+    )
+
+    assert_operator_matches_cpu(
+        case,
+        copy_storage_from_cpu=infini_ops_test_module.copy_storage_from_cpu,
+    )
+
+
 def test_add_tensor_broadcast_error_matches_cpu_oracle() -> None:
     case = OperatorCase(
         "incompatible-broadcast",
@@ -152,45 +176,15 @@ def test_add_tensor_broadcast_error_matches_cpu_oracle() -> None:
     assert_operator_matches_cpu(case, error_match=r"must match.*size")
 
 
-@pytest.mark.xfail(
-    reason="aten::add.Tensor does not preserve dense transposed output strides",
-    raises=ExpectedOperatorGapError,
-    strict=True,
-)
-def test_add_tensor_expected_transposed_output_metadata_gap(
+def test_add_tensor_transposed_output_layout_matches_cpu_oracle(
     infini_ops_test_module,
 ) -> None:
     case = OperatorCase("transposed-output-layout", torch.add, _transposed_inputs)
-    expected = invoke(case, "cpu")
-    actual = invoke(
+
+    assert_operator_matches_cpu(
         case,
-        "infini",
-        infini_ops_test_module.copy_storage_from_cpu,
-    )
-
-    assert expected.error is None
-    assert expected.tensor is not None
-    assert actual.error is None
-    assert actual.tensor is not None
-    assert actual.tensor.device.type == "infini"
-    assert_tensor_values_match(case.name, expected.tensor, actual.tensor)
-
-    expected_metadata = tensor_metadata(expected.tensor)
-    actual_metadata = tensor_metadata(actual.tensor)
-    differences = {
-        field: (expected_value, actual_metadata[field])
-        for field, expected_value in expected_metadata.items()
-        if actual_metadata[field] != expected_value
-    }
-    if not differences:
-        assert_tensor_matches_cpu(case.name, expected.tensor, actual.tensor)
-        return
-    assert differences == {
-        "stride": ((1, 4), (3, 1)),
-        "is_contiguous": (False, True),
-    }
-    raise ExpectedOperatorGapError(
-        f"{case.name}: CPU/infini output metadata differs: {differences}"
+        copy_storage_from_cpu=infini_ops_test_module.copy_storage_from_cpu,
+        copy_storage_to_cpu=infini_ops_test_module.copy_storage_to_cpu,
     )
 
 
