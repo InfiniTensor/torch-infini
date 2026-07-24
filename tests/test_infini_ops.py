@@ -9,6 +9,44 @@ import torch_infini
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+ALL_OPTIONAL_CAPABILITIES = {
+    "async_memcpy": True,
+    "events": True,
+    "pinned_host_allocation": True,
+    "async_allocation": True,
+    "async_free": True,
+}
+ASYNC_MEMCPY_ONLY_CAPABILITIES = {
+    "async_memcpy": True,
+    "events": False,
+    "pinned_host_allocation": False,
+    "async_allocation": False,
+    "async_free": False,
+}
+NO_ASYNC_MEMORY_CAPABILITIES = {
+    "async_memcpy": True,
+    "events": True,
+    "pinned_host_allocation": True,
+    "async_allocation": False,
+    "async_free": False,
+}
+EXPECTED_RUNTIME_CAPABILITY_POLICY = {
+    "cpu": {
+        "async_memcpy": False,
+        "events": True,
+        "pinned_host_allocation": True,
+        "async_allocation": False,
+        "async_free": False,
+    },
+    "nvidia": ALL_OPTIONAL_CAPABILITIES,
+    "cambricon": ASYNC_MEMCPY_ONLY_CAPABILITIES,
+    "ascend": ASYNC_MEMCPY_ONLY_CAPABILITIES,
+    "metax": ALL_OPTIONAL_CAPABILITIES,
+    "moore": NO_ASYNC_MEMORY_CAPABILITIES,
+    "iluvatar": ALL_OPTIONAL_CAPABILITIES,
+    "hygon": ALL_OPTIONAL_CAPABILITIES,
+}
+
 
 def _dependency_paths(prefix_variable, override_variable, subdirs):
     paths = []
@@ -85,6 +123,26 @@ def infini_ops_test_module(tmp_path_factory):
         build_directory=str(tmp_path_factory.mktemp("infini-ops-extension")),
         verbose=True,
     )
+
+
+def test_every_infinirt_backend_has_explicit_runtime_capabilities(
+    infini_ops_test_module,
+):
+    assert (
+        infini_ops_test_module.runtime_capability_policy()
+        == EXPECTED_RUNTIME_CAPABILITY_POLICY
+    )
+
+
+def test_copy_routing_agrees_with_runtime_capability_model(
+    infini_ops_test_module,
+):
+    expected_routing = {
+        backend: capabilities["async_memcpy"]
+        for backend, capabilities in EXPECTED_RUNTIME_CAPABILITY_POLICY.items()
+    }
+
+    assert infini_ops_test_module.copy_async_memcpy_routing() == expected_routing
 
 
 @pytest.mark.parametrize(
