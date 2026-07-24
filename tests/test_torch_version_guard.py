@@ -60,6 +60,53 @@ def test_mismatched_torch_minor_is_rejected():
         )
 
 
+@pytest.mark.parametrize("cxx11_abi", [False, True])
+def test_matching_torch_cxx11_abi_is_accepted(cxx11_abi):
+    compatibility = _load_compatibility_module()
+
+    compatibility.check_torch_cxx11_abi(
+        runtime_cxx11_abi=cxx11_abi,
+        build_cxx11_abi=cxx11_abi,
+    )
+
+
+def test_mismatched_torch_cxx11_abi_is_rejected():
+    compatibility = _load_compatibility_module()
+
+    with pytest.raises(
+        ImportError,
+        match=(
+            "built against PyTorch with the CXX11 ABI enabled, but the "
+            "installed PyTorch has the CXX11 ABI disabled"
+        ),
+    ):
+        compatibility.check_torch_cxx11_abi(
+            runtime_cxx11_abi=False,
+            build_cxx11_abi=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("runtime_cxx11_abi", "build_cxx11_abi", "message"),
+    [
+        (None, True, "runtime PyTorch CXX11 ABI flag is invalid"),
+        (1, True, "runtime PyTorch CXX11 ABI flag is invalid"),
+        (True, None, "recorded PyTorch CXX11 ABI flag is None"),
+        (True, 1, "recorded PyTorch CXX11 ABI flag is 1"),
+    ],
+)
+def test_unavailable_or_malformed_cxx11_abi_fails_clearly(
+    runtime_cxx11_abi, build_cxx11_abi, message
+):
+    compatibility = _load_compatibility_module()
+
+    with pytest.raises(ImportError, match=message):
+        compatibility.check_torch_cxx11_abi(
+            runtime_cxx11_abi=runtime_cxx11_abi,
+            build_cxx11_abi=build_cxx11_abi,
+        )
+
+
 @pytest.mark.parametrize(
     ("runtime_version", "build_version", "build_major_minor", "message"),
     [
@@ -89,14 +136,30 @@ def test_unavailable_or_malformed_versions_fail_clearly(
     [
         (None, "build metadata is unavailable"),
         (
-            'BUILD_TORCH_VERSION = "invalid"\nBUILD_TORCH_MAJOR_MINOR = "2.12"\n',
+            'BUILD_TORCH_VERSION = "invalid"\n'
+            'BUILD_TORCH_MAJOR_MINOR = "2.12"\n'
+            "BUILD_TORCH_CXX11_ABI = True\n",
             "build metadata is invalid",
         ),
         ('BUILD_TORCH_VERSION = "2.13.0"\n', "build metadata is invalid"),
         ("BUILD_TORCH_VERSION =\n", "build metadata is invalid"),
         (
-            'BUILD_TORCH_VERSION = "2.12.0+cpu"\nBUILD_TORCH_MAJOR_MINOR = "2.12"\n',
+            'BUILD_TORCH_VERSION = "2.12.0+cpu"\n'
+            'BUILD_TORCH_MAJOR_MINOR = "2.12"\n'
+            "BUILD_TORCH_CXX11_ABI = True\n",
             "was built against PyTorch 2.12.0\\+cpu",
+        ),
+        (
+            'BUILD_TORCH_VERSION = "2.13.0+cpu"\n'
+            'BUILD_TORCH_MAJOR_MINOR = "2.13"\n'
+            "BUILD_TORCH_CXX11_ABI = False\n",
+            "built against PyTorch with the CXX11 ABI disabled",
+        ),
+        (
+            'BUILD_TORCH_VERSION = "2.13.0+cpu"\n'
+            'BUILD_TORCH_MAJOR_MINOR = "2.13"\n'
+            "BUILD_TORCH_CXX11_ABI = 1\n",
+            "recorded PyTorch CXX11 ABI flag is 1",
         ),
     ],
 )
@@ -117,6 +180,7 @@ def test_guard_fails_before_backend_rename_and_native_import(
     rename_calls = []
     torch = types.ModuleType("torch")
     torch.__version__ = "2.13.0+cpu"
+    torch.compiled_with_cxx11_abi = lambda: True
     torch.utils = types.SimpleNamespace(rename_privateuse1_backend=rename_calls.append)
     monkeypatch.setitem(sys.modules, "torch", torch)
 

@@ -77,3 +77,32 @@ def check_torch_version(
             f"{runtime_version} (major.minor {runtime_major_minor}). Install a "
             "torch-infini wheel built with the installed PyTorch minor version."
         )
+
+
+def check_torch_cxx11_abi(
+    *,
+    runtime_cxx11_abi: object,
+    build_cxx11_abi: object,
+) -> None:
+    """Reject a native extension built for another PyTorch CXX11 ABI."""
+    if type(runtime_cxx11_abi) is not bool:
+        raise ImportError(
+            "torch-infini cannot verify compatibility because the runtime PyTorch "
+            f"CXX11 ABI flag is invalid: {runtime_cxx11_abi!r}."
+        )
+    if type(build_cxx11_abi) is not bool:
+        raise ImportError(
+            "torch-infini build metadata is invalid: the recorded PyTorch CXX11 "
+            f"ABI flag is {build_cxx11_abi!r}."
+        )
+    if runtime_cxx11_abi != build_cxx11_abi:
+        raise ImportError(
+            "torch-infini was built against PyTorch with the CXX11 ABI "
+            f"{_enabled_or_disabled(build_cxx11_abi)}, but the installed PyTorch "
+            f"has the CXX11 ABI {_enabled_or_disabled(runtime_cxx11_abi)}. Install "
+            "a torch-infini wheel built with the installed PyTorch CXX11 ABI."
+        )
+
+
+def _enabled_or_disabled(value: bool) -> str:
+    return "enabled" if value else "disabled"

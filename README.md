@@ -87,13 +87,13 @@ InfiniRT commit `95c70080f9551e61241110497d163dfcdf9dc7e7` and InfiniOps commit
 `296271487beb594a248fd463e5fff14f7ab74293`.
 
 Binary wheel builds, editable builds, and in-place builds record the full
-PyTorch version and normalized major.minor version used to compile the
-extension. At import time, torch-infini requires the runtime PyTorch major.minor
-version to match before it registers the `infini` backend or loads the native
-extension. Patch versions and local, development, alpha, beta, and
-release-candidate suffixes may differ when the leading major.minor version
-matches. Rebuild or reinstall torch-infini after changing the PyTorch minor
-version.
+PyTorch version, normalized major.minor version, and CXX11 ABI mode used to
+compile the extension. At import time, torch-infini requires the runtime
+PyTorch major.minor version and CXX11 ABI mode to match before it registers the
+`infini` backend or loads the native extension. Patch versions and local,
+development, alpha, beta, and release-candidate suffixes may differ when the
+leading major.minor version matches. Rebuild or reinstall torch-infini after
+changing the PyTorch minor version or CXX11 ABI mode.
 
 ## Runtime backend
 
