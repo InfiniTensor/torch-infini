@@ -6,9 +6,11 @@
 #include <c10/core/DeviceType.h>
 #include <c10/core/Stream.h>
 #include <c10/core/impl/DeviceGuardImplInterface.h>
+#include <c10/util/Exception.h>
 #include <infini/rt.h>
 #include <torch/library.h>
 
+#include <array>
 #include <cstddef>
 #include <functional>
 #include <optional>
@@ -20,6 +22,110 @@ namespace rt = infini::rt::runtime;
 
 constexpr const char* kBackendName = "infini";
 constexpr c10::DeviceType kDeviceType = c10::DeviceType::PrivateUse1;
+
+struct RuntimeCapabilities {
+  bool async_memcpy;
+  bool events;
+  bool pinned_host_allocation;
+  bool async_allocation;
+  bool async_free;
+};
+
+namespace detail {
+
+using RuntimeDeviceType = infini::rt::Device::Type;
+
+struct RuntimeCapabilityPolicy {
+  RuntimeDeviceType device_type;
+  RuntimeCapabilities capabilities;
+};
+
+inline constexpr RuntimeCapabilities kAllTrackedCapabilities{
+    true,
+    true,
+    true,
+    true,
+    true};
+inline constexpr RuntimeCapabilities kCpuCapabilities{
+    false,
+    true,
+    true,
+    false,
+    false};
+inline constexpr RuntimeCapabilities kAsyncMemcpyOnlyCapabilities{
+    true,
+    false,
+    false,
+    false,
+    false};
+inline constexpr RuntimeCapabilities kNoAsyncMemoryCapabilities{
+    true,
+    true,
+    true,
+    false,
+    false};
+
+// Pinned to InfiniRT 95c70080f9551e61241110497d163dfcdf9dc7e7.
+inline constexpr std::array kRuntimeCapabilityPolicy{
+    RuntimeCapabilityPolicy{RuntimeDeviceType::kCpu, kCpuCapabilities},
+    RuntimeCapabilityPolicy{
+        RuntimeDeviceType::kNvidia,
+        kAllTrackedCapabilities},
+    RuntimeCapabilityPolicy{
+        RuntimeDeviceType::kCambricon,
+        kAsyncMemcpyOnlyCapabilities},
+    RuntimeCapabilityPolicy{
+        RuntimeDeviceType::kAscend,
+        kAsyncMemcpyOnlyCapabilities},
+    RuntimeCapabilityPolicy{RuntimeDeviceType::kMetax, kAllTrackedCapabilities},
+    RuntimeCapabilityPolicy{
+        RuntimeDeviceType::kMoore,
+        kNoAsyncMemoryCapabilities},
+    RuntimeCapabilityPolicy{
+        RuntimeDeviceType::kIluvatar,
+        kAllTrackedCapabilities},
+    RuntimeCapabilityPolicy{RuntimeDeviceType::kHygon, kAllTrackedCapabilities},
+};
+
+constexpr bool runtime_capability_policy_is_complete() {
+  if (kRuntimeCapabilityPolicy.size() !=
+      static_cast<std::size_t>(RuntimeDeviceType::kCount)) {
+    return false;
+  }
+  for (std::size_t index = 0; index < kRuntimeCapabilityPolicy.size();
+       ++index) {
+    if (static_cast<std::size_t>(kRuntimeCapabilityPolicy[index].device_type) !=
+        index) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static_assert(
+    runtime_capability_policy_is_complete(),
+    "Every InfiniRT backend needs an explicit capability policy");
+
+} // namespace detail
+
+inline const RuntimeCapabilities& runtime_capabilities(
+    infini::rt::Device::Type device_type) {
+  const auto index = static_cast<int>(device_type);
+  TORCH_CHECK(
+      index >= 0 &&
+          static_cast<std::size_t>(index) <
+              detail::kRuntimeCapabilityPolicy.size() &&
+          detail::kRuntimeCapabilityPolicy[static_cast<std::size_t>(index)]
+                  .device_type == device_type,
+      "torch-infini has no capability policy for InfiniRT backend enum ",
+      index);
+  return detail::kRuntimeCapabilityPolicy[static_cast<std::size_t>(index)]
+      .capabilities;
+}
+
+inline bool supports_async_memcpy(infini::rt::Device::Type device_type) {
+  return runtime_capabilities(device_type).async_memcpy;
+}
 
 void check(rt::Error status, const char* call);
 

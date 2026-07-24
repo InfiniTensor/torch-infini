@@ -39,26 +39,6 @@ void check_copy_shape(const at::Tensor& dst, const at::Tensor& src) {
       "infini copy_ currently only supports contiguous tensors");
 }
 
-bool supports_async_memcpy(infini::rt::Device::Type device_type) {
-  using DeviceType = infini::rt::Device::Type;
-
-  // InfiniRT has no portable unsupported status, so use its pinned capability
-  // table instead of treating every asynchronous copy error as unsupported.
-  switch (device_type) {
-    case DeviceType::kNvidia:
-    case DeviceType::kCambricon:
-    case DeviceType::kAscend:
-    case DeviceType::kMetax:
-    case DeviceType::kMoore:
-    case DeviceType::kIluvatar:
-    case DeviceType::kHygon:
-      return true;
-    case DeviceType::kCpu:
-    default:
-      return false;
-  }
-}
-
 void copy_on_stream(
     void* dst,
     const void* src,

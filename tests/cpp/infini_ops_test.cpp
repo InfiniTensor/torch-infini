@@ -46,6 +46,35 @@ py::dict device_metadata(const std::string& device_name) {
   return metadata;
 }
 
+py::dict runtime_capability_policy() {
+  py::dict policy;
+  using DeviceType = infini::rt::Device::Type;
+  for (int index = 0; index < static_cast<int>(DeviceType::kCount); ++index) {
+    const auto device_type = static_cast<DeviceType>(index);
+    const auto& capabilities = torch_infini::runtime_capabilities(device_type);
+    py::dict entry;
+    entry["async_memcpy"] = capabilities.async_memcpy;
+    entry["events"] = capabilities.events;
+    entry["pinned_host_allocation"] =
+        capabilities.pinned_host_allocation;
+    entry["async_allocation"] = capabilities.async_allocation;
+    entry["async_free"] = capabilities.async_free;
+    policy[py::str(infini::rt::Device::StringFromType(device_type))] = entry;
+  }
+  return policy;
+}
+
+py::dict copy_async_memcpy_routing() {
+  py::dict routing;
+  using DeviceType = infini::rt::Device::Type;
+  for (int index = 0; index < static_cast<int>(DeviceType::kCount); ++index) {
+    const auto device_type = static_cast<DeviceType>(index);
+    routing[py::str(infini::rt::Device::StringFromType(device_type))] =
+        torch_infini::supports_async_memcpy(device_type);
+  }
+  return routing;
+}
+
 py::dict execution_context_metadata(std::uintptr_t stream_address) {
   const auto stream =
       reinterpret_cast<infini::rt::runtime::Stream>(stream_address);
@@ -230,6 +259,8 @@ void copy_storage_from_cpu(at::Tensor destination, const at::Tensor& source) {
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("tensor_metadata", &tensor_metadata);
   m.def("device_metadata", &device_metadata);
+  m.def("runtime_capability_policy", &runtime_capability_policy);
+  m.def("copy_async_memcpy_routing", &copy_async_memcpy_routing);
   m.def("execution_context_metadata", &execution_context_metadata);
   m.def(
       "current_execution_context_metadata",
