@@ -86,8 +86,14 @@ Source-build compatibility is tested for every combination of Python 3.10,
 InfiniRT commit `95c70080f9551e61241110497d163dfcdf9dc7e7` and InfiniOps commit
 `296271487beb594a248fd463e5fff14f7ab74293`.
 
-Native wheels are not guaranteed to work across PyTorch minor versions. Build
-the wheel with the PyTorch minor version that will be used at runtime.
+Binary wheel builds, editable builds, and in-place builds record the full
+PyTorch version and normalized major.minor version used to compile the
+extension. At import time, torch-infini requires the runtime PyTorch major.minor
+version to match before it registers the `infini` backend or loads the native
+extension. Patch versions and local, development, alpha, beta, and
+release-candidate suffixes may differ when the leading major.minor version
+matches. Rebuild or reinstall torch-infini after changing the PyTorch minor
+version.
 
 ## Runtime backend
 

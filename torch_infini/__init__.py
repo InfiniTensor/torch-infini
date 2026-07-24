@@ -4,6 +4,33 @@ from __future__ import annotations
 
 import torch
 
+from ._compatibility import check_torch_version
+
+try:
+    from ._build_info import BUILD_TORCH_MAJOR_MINOR, BUILD_TORCH_VERSION
+except ModuleNotFoundError as exc:
+    raise ImportError(
+        "torch-infini build metadata is unavailable. Reinstall torch-infini from a "
+        "complete wheel or rebuild it."
+    ) from exc
+except ImportError as exc:
+    raise ImportError(
+        "torch-infini build metadata is invalid. Reinstall torch-infini from a "
+        "complete wheel or rebuild it."
+    ) from exc
+except SyntaxError as exc:
+    raise ImportError(
+        "torch-infini build metadata is invalid. Reinstall torch-infini from a "
+        "complete wheel or rebuild it."
+    ) from exc
+
+
+check_torch_version(
+    runtime_version=getattr(torch, "__version__", None),
+    build_version=BUILD_TORCH_VERSION,
+    build_major_minor=BUILD_TORCH_MAJOR_MINOR,
+)
+
 _BACKEND_NAME = "infini"
 
 
