@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import torch
 
-from ._compatibility import check_torch_version
+from ._compatibility import check_torch_cxx11_abi, check_torch_version
 
 try:
-    from ._build_info import BUILD_TORCH_MAJOR_MINOR, BUILD_TORCH_VERSION
+    from ._build_info import (
+        BUILD_TORCH_CXX11_ABI,
+        BUILD_TORCH_MAJOR_MINOR,
+        BUILD_TORCH_VERSION,
+    )
 except ModuleNotFoundError as exc:
     raise ImportError(
         "torch-infini build metadata is unavailable. Reinstall torch-infini from a "
@@ -29,6 +33,13 @@ check_torch_version(
     runtime_version=getattr(torch, "__version__", None),
     build_version=BUILD_TORCH_VERSION,
     build_major_minor=BUILD_TORCH_MAJOR_MINOR,
+)
+_compiled_with_cxx11_abi = getattr(torch, "compiled_with_cxx11_abi", None)
+check_torch_cxx11_abi(
+    runtime_cxx11_abi=(
+        _compiled_with_cxx11_abi() if callable(_compiled_with_cxx11_abi) else None
+    ),
+    build_cxx11_abi=BUILD_TORCH_CXX11_ABI,
 )
 
 _BACKEND_NAME = "infini"
