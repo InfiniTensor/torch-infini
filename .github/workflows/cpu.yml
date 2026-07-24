@@ -21,26 +21,32 @@ jobs:
           - job_name: CPU
             python_version: "3.12.13"
             pytorch_version: "2.13.0+cpu"
+            mismatch_pytorch_version: "2.12.0+cpu"
             artifact_name: torch-cuda-api-gaps
           - job_name: CPU (Python 3.10, PyTorch 2.12)
             python_version: "3.10.18"
             pytorch_version: "2.12.0+cpu"
+            mismatch_pytorch_version: "2.13.0+cpu"
             artifact_name: torch-cuda-api-gaps-python-3.10-pytorch-2.12
           - job_name: CPU (Python 3.10, PyTorch 2.13)
             python_version: "3.10.18"
             pytorch_version: "2.13.0+cpu"
+            mismatch_pytorch_version: ""
             artifact_name: torch-cuda-api-gaps-python-3.10-pytorch-2.13
           - job_name: CPU (Python 3.11, PyTorch 2.12)
             python_version: "3.11.13"
             pytorch_version: "2.12.0+cpu"
+            mismatch_pytorch_version: ""
             artifact_name: torch-cuda-api-gaps-python-3.11-pytorch-2.12
           - job_name: CPU (Python 3.11, PyTorch 2.13)
             python_version: "3.11.13"
             pytorch_version: "2.13.0+cpu"
+            mismatch_pytorch_version: ""
             artifact_name: torch-cuda-api-gaps-python-3.11-pytorch-2.13
           - job_name: CPU (Python 3.12, PyTorch 2.12)
             python_version: "3.12.13"
             pytorch_version: "2.12.0+cpu"
+            mismatch_pytorch_version: ""
             artifact_name: torch-cuda-api-gaps-python-3.12-pytorch-2.12
     env:
       INFINIRT_COMMIT: 95c70080f9551e61241110497d163dfcdf9dc7e7
@@ -149,7 +155,12 @@ jobs:
           python - <<'PY'
           import torch
           import torch_infini
+          from torch_infini import _build_info
 
+          assert _build_info.BUILD_TORCH_VERSION == torch.__version__
+          assert _build_info.BUILD_TORCH_MAJOR_MINOR == ".".join(
+              torch.__version__.split(".")[:2]
+          )
           assert torch_infini._C._runtime_backend_name() == "cpu"
           assert torch.infini.is_available()
           assert torch.infini.device_count() > 0
@@ -185,3 +196,43 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: ${{ runner.temp }}/conformance
           if-no-files-found: error
+      - name: Install mismatched PyTorch
+        if: matrix.mismatch_pytorch_version != ''
+        env:
+          MISMATCH_PYTORCH_VERSION: ${{ matrix.mismatch_pytorch_version }}
+        run: >-
+          python -m pip install
+          --force-reinstall
+          --no-deps
+          --index-url https://download.pytorch.org/whl/cpu
+          "torch==$MISMATCH_PYTORCH_VERSION"
+      - name: Verify PyTorch minor mismatch is rejected
+        if: matrix.mismatch_pytorch_version != ''
+        working-directory: ${{ runner.temp }}
+        env:
+          BUILD_PYTORCH_VERSION: ${{ matrix.pytorch_version }}
+        run: |
+          python - <<'PY'
+          import os
+
+          import torch
+
+
+          def major_minor(version):
+              return ".".join(version.split("+")[0].split(".")[:2])
+
+
+          build_version = os.environ["BUILD_PYTORCH_VERSION"]
+          try:
+              import torch_infini  # noqa: F401
+          except ImportError as exc:
+              message = str(exc)
+          else:
+              raise AssertionError("torch_infini accepted a cross-minor PyTorch")
+
+          assert f"built against PyTorch {build_version}" in message
+          assert f"major.minor {major_minor(build_version)}" in message
+          assert f"installed PyTorch is {torch.__version__}" in message
+          assert f"major.minor {major_minor(torch.__version__)}" in message
+          assert torch._C._get_privateuse1_backend_name() == "privateuseone"
+          PY

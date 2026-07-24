@@ -16,24 +16,38 @@ def _run_setup(monkeypatch):
         captured["extension"] = kwargs
         return kwargs
 
+    class BuildPy:
+        def run(self):
+            captured["build_py_run"] = True
+
+    class BuildExtension:
+        def run(self):
+            captured["build_ext_run"] = True
+
     setuptools = types.ModuleType("setuptools")
     setuptools.setup = lambda **kwargs: captured.setdefault("setup", kwargs)
+    setuptools_command = types.ModuleType("setuptools.command")
+    build_py_module = types.ModuleType("setuptools.command.build_py")
+    build_py_module.build_py = BuildPy
     cpp_extension_module = types.ModuleType("torch.utils.cpp_extension")
-    cpp_extension_module.BuildExtension = object
+    cpp_extension_module.BuildExtension = BuildExtension
     cpp_extension_module.CppExtension = cpp_extension
     cpp_extension_module.CUDA_HOME = None
     torch_utils = types.ModuleType("torch.utils")
     torch_utils.cpp_extension = cpp_extension_module
     torch = types.ModuleType("torch")
+    torch.__version__ = "2.13.0a0+gitabcdef"
     torch.utils = torch_utils
 
     monkeypatch.setitem(sys.modules, "setuptools", setuptools)
+    monkeypatch.setitem(sys.modules, "setuptools.command", setuptools_command)
+    monkeypatch.setitem(sys.modules, "setuptools.command.build_py", build_py_module)
     monkeypatch.setitem(sys.modules, "torch", torch)
     monkeypatch.setitem(sys.modules, "torch.utils", torch_utils)
     monkeypatch.setitem(sys.modules, "torch.utils.cpp_extension", cpp_extension_module)
 
     runpy.run_path(str(REPO_ROOT / "setup.py"), run_name="__main__")
-    return captured["extension"]
+    return captured
 
 
 def test_infiniops_and_infinirt_paths_are_only_used_for_linking(monkeypatch, tmp_path):
@@ -64,7 +78,7 @@ def test_infiniops_and_infinirt_paths_are_only_used_for_linking(monkeypatch, tmp
     monkeypatch.setenv("INFINI_RT_INCLUDE_DIRS", str(extra_infini_rt_include_dir))
     monkeypatch.setenv("INFINI_RT_LIBRARY_DIRS", str(extra_infini_rt_library_dir))
 
-    extension = _run_setup(monkeypatch)
+    extension = _run_setup(monkeypatch)["extension"]
 
     assert extension["libraries"] == []
     assert extension["extra_link_args"] == [
@@ -105,3 +119,27 @@ def test_infiniops_paths_are_required(monkeypatch, tmp_path):
 
     with pytest.raises(RuntimeError, match="InfiniOps headers were not found"):
         _run_setup(monkeypatch)
+
+
+@pytest.mark.parametrize("command_name", ["build_py", "build_ext"])
+def test_build_commands_generate_torch_build_info(monkeypatch, tmp_path, command_name):
+    infini_ops_include_dir = tmp_path / "infiniops" / "include"
+    infini_rt_include_dir = tmp_path / "infinirt" / "include"
+    infini_ops_include_dir.mkdir(parents=True)
+    infini_rt_include_dir.mkdir(parents=True)
+    monkeypatch.setenv("INFINI_OPS_INCLUDE_DIRS", str(infini_ops_include_dir))
+    monkeypatch.setenv("INFINI_RT_INCLUDE_DIRS", str(infini_rt_include_dir))
+
+    captured = _run_setup(monkeypatch)
+    package_root = tmp_path / "package-root"
+    (package_root / "torch_infini").mkdir(parents=True)
+    command = captured["setup"]["cmdclass"][command_name]
+    command.run.__globals__["PACKAGE_ROOT"] = package_root
+
+    command().run()
+
+    build_info_path = package_root / "torch_infini" / "_build_info.py"
+    build_info = runpy.run_path(str(build_info_path))
+    assert build_info["BUILD_TORCH_VERSION"] == "2.13.0a0+gitabcdef"
+    assert build_info["BUILD_TORCH_MAJOR_MINOR"] == "2.13"
+    assert captured[f"{command_name}_run"] is True

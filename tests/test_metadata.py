@@ -66,6 +66,25 @@ def test_ci_matrix_matches_the_documented_compatibility_policy():
     assert len({row["artifact_name"] for row in matrix}) == len(matrix)
     assert sum(row["job_name"] == "CPU" for row in matrix) == 1
 
+    cross_minor_pairs = {
+        (
+            ".".join(row["pytorch_version"].split("+")[0].split(".")[:2]),
+            ".".join(row["mismatch_pytorch_version"].split("+")[0].split(".")[:2]),
+        )
+        for row in matrix
+        if row.get("mismatch_pytorch_version")
+    }
+    assert cross_minor_pairs == {("2.12", "2.13"), ("2.13", "2.12")}
+
+    step_names = [step["name"] for step in cpu_job["steps"]]
+    assert step_names[-2:] == [
+        "Install mismatched PyTorch",
+        "Verify PyTorch minor mismatch is rejected",
+    ]
+    assert (
+        step_names.index("Run test suite outside the source tree") < len(step_names) - 2
+    )
+
     readme = " ".join((REPO_ROOT / "README.md").read_text().split())
     for env_name, (project, commit) in EXPECTED_NATIVE_COMMITS.items():
         assert cpu_job["env"][env_name] == commit

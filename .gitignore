@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+/torch_infini/_build_info.py
 
 # Distribution / packaging
 .Python
