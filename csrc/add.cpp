@@ -1,4 +1,5 @@
 #include <ATen/ExpandUtils.h>
+#include <ATen/ops/empty_like.h>
 #include <c10/core/DeviceGuard.h>
 #include <c10/util/Exception.h>
 
@@ -55,6 +56,15 @@ void check_native_add_support(infini::rt::Device::Type device_type) {
   }
 }
 
+at::Tensor allocate_add_output(
+    const at::Tensor& self,
+    c10::IntArrayRef output_size) {
+  if (self.sizes().equals(output_size) && self.is_non_overlapping_and_dense()) {
+    return at::empty_like(self, self.options(), at::MemoryFormat::Preserve);
+  }
+  return at::empty(output_size, self.options());
+}
+
 } // namespace
 
 at::Tensor add(
@@ -70,7 +80,7 @@ at::Tensor add(
   check_native_add_support(runtime_device.type());
   (void)infini_ops::to_data_type(self.scalar_type());
 
-  auto output = at::empty(output_size, self.options());
+  auto output = allocate_add_output(self, output_size);
   if (output.numel() == 0) {
     return output;
   }
