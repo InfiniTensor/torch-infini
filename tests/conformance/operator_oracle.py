@@ -85,6 +85,7 @@ def assert_operator_matches_cpu(
     device: str = "infini",
     error_match: str | None = None,
     copy_storage_from_cpu: StorageCopier | None = None,
+    copy_storage_to_cpu: StorageCopier | None = None,
 ) -> None:
     expected = invoke(case, "cpu")
     actual = invoke(case, device, copy_storage_from_cpu)
@@ -114,7 +115,13 @@ def assert_operator_matches_cpu(
 
     if expected.tensor is None or actual.tensor is None:
         raise AssertionError(f"{case.name}: missing successful tensor result")
-    assert_tensor_matches_cpu(case.name, expected.tensor, actual.tensor, device)
+    assert_tensor_matches_cpu(
+        case.name,
+        expected.tensor,
+        actual.tensor,
+        device,
+        copy_storage_to_cpu,
+    )
 
 
 def assert_tensor_matches_cpu(
@@ -122,6 +129,7 @@ def assert_tensor_matches_cpu(
     expected: torch.Tensor,
     actual: torch.Tensor,
     device: str = "infini",
+    copy_storage_to_cpu: StorageCopier | None = None,
 ) -> None:
     expected_device_type = torch.device(device).type
     if actual.device.type != expected_device_type:
@@ -138,16 +146,17 @@ def assert_tensor_matches_cpu(
             f"CPU: {expected_metadata}\n"
             f"{device}: {actual_metadata}"
         )
-    assert_tensor_values_match(case_name, expected, actual)
+    assert_tensor_values_match(case_name, expected, actual, copy_storage_to_cpu)
 
 
 def assert_tensor_values_match(
     case_name: str,
     expected: torch.Tensor,
     actual: torch.Tensor,
+    copy_storage_to_cpu: StorageCopier | None = None,
 ) -> None:
     torch.testing.assert_close(
-        _copy_result_to_cpu(actual),
+        _copy_result_to_cpu(actual, copy_storage_to_cpu),
         expected,
         msg=lambda message: f"{case_name}: output values differ\n{message}",
     )
@@ -165,13 +174,29 @@ def tensor_metadata(tensor: torch.Tensor) -> dict[str, object]:
     }
 
 
-def _copy_result_to_cpu(result: torch.Tensor) -> torch.Tensor:
+def _copy_result_to_cpu(
+    result: torch.Tensor,
+    copy_storage_to_cpu: StorageCopier | None,
+) -> torch.Tensor:
     if result.device.type == "cpu":
         return result
     if result.device.type != "infini":
         raise AssertionError(f"cannot copy a {result.device.type} result to CPU")
 
     torch.infini.synchronize(result.device)
+    if not result.is_contiguous():
+        if copy_storage_to_cpu is None:
+            raise AssertionError(
+                "a raw storage copier is required for noncontiguous Infini results"
+            )
+        cpu_result = torch.empty_strided(
+            result.shape,
+            result.stride(),
+            dtype=result.dtype,
+        )
+        copy_storage_to_cpu(cpu_result, result)
+        return cpu_result
+
     cpu_result = torch.empty(result.shape, dtype=result.dtype)
     cpu_result.copy_(result)
     return cpu_result

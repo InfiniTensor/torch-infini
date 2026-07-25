@@ -196,6 +196,8 @@ def test_add_tensor_supports_noncontiguous_inputs(infini_ops_test_module):
     result = torch.add(lhs, rhs)
 
     torch.infini.synchronize(result.device)
-    result_cpu = torch.empty(result.shape, dtype=result.dtype)
-    result_cpu.copy_(result)
-    torch.testing.assert_close(result_cpu, torch.add(lhs_cpu, rhs_cpu))
+    expected = torch.add(lhs_cpu, rhs_cpu)
+    assert result.stride() == expected.stride()
+    result_cpu = torch.empty_strided(result.shape, result.stride(), dtype=result.dtype)
+    infini_ops_test_module.copy_storage_to_cpu(result_cpu, result)
+    torch.testing.assert_close(result_cpu, expected)
