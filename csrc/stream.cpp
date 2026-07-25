@@ -59,33 +59,6 @@ class StreamRegistry {
   StreamRegistry(const StreamRegistry&) = delete;
   StreamRegistry& operator=(const StreamRegistry&) = delete;
 
-  ~StreamRegistry() {
-    if (!try_ensure_runtime_backend_for_current_thread()) {
-      return;
-    }
-
-    int original_device = 0;
-    const bool restore_device = rt::GetDevice(&original_device) == rt::kSuccess;
-    for (std::size_t device = 0; device < streams_.size(); ++device) {
-      if (rt::SetDevice(static_cast<int>(device)) != rt::kSuccess) {
-        continue;
-      }
-      for (const auto& [stream_id, entry] : streams_[device]) {
-        (void)stream_id;
-        (void)rt::StreamSynchronize(entry.stream);
-        if (entry.query_event_created) {
-          (void)rt::EventDestroy(entry.query_event);
-        }
-        if (entry.owned) {
-          (void)rt::StreamDestroy(entry.stream);
-        }
-      }
-    }
-    if (restore_device) {
-      (void)rt::SetDevice(original_device);
-    }
-  }
-
   c10::Stream create(c10::Device device, int priority) {
     TORCH_CHECK(
         priority == 0,
@@ -211,8 +184,10 @@ class StreamRegistry {
 };
 
 StreamRegistry& stream_registry() {
-  static StreamRegistry registry;
-  return registry;
+  // Extension static teardown may run after the accelerator runtime has
+  // started shutting down. The process reclaims these native handles.
+  static auto* registry = new StreamRegistry();
+  return *registry;
 }
 
 std::vector<c10::StreamId>& current_stream_ids() {

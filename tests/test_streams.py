@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import threading
 
 import pytest
@@ -151,6 +153,36 @@ def test_stream_query_rejects_exposed_native_handle():
 
     with pytest.raises(RuntimeError, match="InfiniRT does not expose StreamQuery"):
         stream.query()
+
+
+def test_process_exits_after_stream_work():
+    code = "\n".join(
+        [
+            "import torch",
+            "import torch_infini",
+            "source = torch.arange(262144, dtype=torch.float32)",
+            "device_source = torch.empty_like(source, device='infini')",
+            "device_source.copy_(source)",
+            "streams = [torch.infini.Stream() for _ in range(8)]",
+            "results = []",
+            "for stream in streams:",
+            "    with torch.infini.stream(stream):",
+            "        results.append(torch.add(device_source, device_source))",
+            "    stream.synchronize()",
+            "assert all(stream.query() for stream in streams)",
+            "assert len(results) == len(streams)",
+        ]
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize("non_blocking", [False, True])
