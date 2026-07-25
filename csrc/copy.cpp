@@ -46,7 +46,8 @@ void copy_on_stream(
     rt::MemcpyKind kind,
     const c10::Stream& stream,
     const char* async_call,
-    const char* sync_call) {
+    const char* sync_call,
+    bool synchronize_after) {
   if (!supports_async_memcpy(infini::rt::runtime_device_type())) {
     run_synchronous_stream_work(
         stream, [&] { check(rt::Memcpy(dst, src, nbytes, kind), sync_call); });
@@ -56,13 +57,43 @@ void copy_on_stream(
   submit_stream_work(stream, [&](rt::Stream native_stream) {
     check(rt::MemcpyAsync(dst, src, nbytes, kind, native_stream), async_call);
   });
-  synchronize_stream(stream);
+  if (synchronize_after) {
+    synchronize_stream(stream);
+  }
+}
+
+bool can_copy_host_nonblocking(
+    const at::Tensor& host,
+    const at::Tensor& device,
+    const c10::Stream& stream,
+    bool non_blocking) {
+  if (!non_blocking || !is_pinned_ptr(host.data_ptr())) {
+    return false;
+  }
+  const auto& capabilities =
+      runtime_capabilities(infini::rt::runtime_device_type());
+  return capabilities.async_memcpy && capabilities.pinned_host_allocation &&
+      can_record_allocation_stream(device, stream);
+}
+
+void record_copy_lifetimes(
+    const at::Tensor& device,
+    const at::Tensor& host,
+    const c10::Stream& stream) {
+  try {
+    record_allocation_stream(device, stream);
+    TORCH_CHECK(
+        record_host_allocation_stream(host, stream),
+        "failed to associate pinned host storage with the infini stream");
+  } catch (...) {
+    synchronize_stream(stream);
+    throw;
+  }
 }
 
 } // namespace
 
 at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
-  (void)non_blocking;
   check_copy_shape(self, src);
 
   const auto nbytes = tensor_nbytes(self);
@@ -73,6 +104,8 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
   if (is_infini(self) && is_cpu(src)) {
     const c10::DeviceGuard guard{self.device()};
     const auto stream = get_current_stream(self.device());
+    const bool return_before_completion =
+        can_copy_host_nonblocking(src, self, stream, non_blocking);
     copy_on_stream(
         self.data_ptr(),
         src.data_ptr(),
@@ -80,13 +113,19 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
         rt::kMemcpyHostToDevice,
         stream,
         "MemcpyAsync(HostToDevice)",
-        "Memcpy(HostToDevice)");
+        "Memcpy(HostToDevice)",
+        !return_before_completion);
+    if (return_before_completion) {
+      record_copy_lifetimes(self, src, stream);
+    }
     return self;
   }
 
   if (is_cpu(self) && is_infini(src)) {
     const c10::DeviceGuard guard{src.device()};
     const auto stream = get_current_stream(src.device());
+    const bool return_before_completion =
+        can_copy_host_nonblocking(self, src, stream, non_blocking);
     copy_on_stream(
         self.data_ptr(),
         src.data_ptr(),
@@ -94,7 +133,11 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
         rt::kMemcpyDeviceToHost,
         stream,
         "MemcpyAsync(DeviceToHost)",
-        "Memcpy(DeviceToHost)");
+        "Memcpy(DeviceToHost)",
+        !return_before_completion);
+    if (return_before_completion) {
+      record_copy_lifetimes(src, self, stream);
+    }
     return self;
   }
 
@@ -111,7 +154,8 @@ at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking) {
         rt::kMemcpyDeviceToDevice,
         stream,
         "MemcpyAsync(DeviceToDevice)",
-        "Memcpy(DeviceToDevice)");
+        "Memcpy(DeviceToDevice)",
+        true);
     return self;
   }
 

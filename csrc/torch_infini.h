@@ -177,6 +177,15 @@ double elapsed_time(
 c10::Allocator* get_allocator();
 c10::Allocator* get_host_allocator();
 bool is_pinned_ptr(const void* data);
+bool can_record_allocation_stream(
+    const at::Tensor& tensor,
+    const c10::Stream& stream);
+void record_allocation_stream(
+    const at::Tensor& tensor,
+    const c10::Stream& stream);
+bool record_host_allocation_stream(
+    const at::Tensor& tensor,
+    const c10::Stream& stream);
 
 void register_privateuse1_hooks();
 

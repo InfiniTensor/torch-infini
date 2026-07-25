@@ -157,18 +157,26 @@ The initial implementation supports:
 - `torch.empty(..., device="infini")`
 - `torch.empty_strided(..., device="infini")`
 - `Tensor.pin_memory("infini")` and `Storage.pin_memory("infini")`
-- synchronous contiguous `copy_` between CPU and Infini tensors
+- contiguous `copy_` between CPU and Infini tensors, with asynchronous return
+  for pinned CPU memory when `non_blocking=True` and the selected InfiniRT
+  backend advertises the required capabilities
 - internal ATen-to-InfiniRT TensorView and InfiniOps execution-context adapters
 - same-dtype, same-device `torch.add(tensor, tensor)` through native InfiniOps
   implementation index 0, including broadcasted and strided inputs
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
 device and stream-management operations it implements. Stream priorities,
-random-number generation, non-blocking copy lifetimes, and other general ATen
-operators are not exposed yet. InfiniRT does not currently expose
-the capabilities needed for blocking or interprocess events, so those event
-constructor options raise `NotImplementedError`. Event operations are validated
-with the InfiniRT CPU and NVIDIA backends; other backends require corresponding
-InfiniRT event support. The initial tensor Add path requires `alpha == 1` and
-does not perform dtype promotion. Unsupported operations should fail clearly
-instead of silently falling back through CPU.
+random-number generation, and other general ATen operators are not exposed yet.
+For CPU-to-Infini and Infini-to-CPU copies, `non_blocking=True` returns before
+completion only when the CPU tensor uses torch-infini pinned memory and the
+selected backend supports both pinned-host allocation and asynchronous memcpy.
+Copies involving ordinary host memory, an unsupported backend, or device
+storage whose lifetime cannot be tracked complete synchronously. This guarantee
+is limited to contiguous CPU-to-Infini and Infini-to-CPU copies and does not
+cover the lifetime of storage used by other asynchronous operators. InfiniRT
+does not currently expose the capabilities needed for blocking or interprocess
+events, so those event constructor options raise `NotImplementedError`. Event
+operations are validated with the InfiniRT CPU and NVIDIA backends; other
+backends require corresponding InfiniRT event support. The initial tensor Add
+path requires `alpha == 1` and does not perform dtype promotion. Unsupported
+operations should fail clearly instead of silently falling back through CPU.
