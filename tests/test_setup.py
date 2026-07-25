@@ -37,6 +37,7 @@ def _run_setup(monkeypatch):
     torch_utils.cpp_extension = cpp_extension_module
     torch = types.ModuleType("torch")
     torch.__version__ = "2.13.0a0+gitabcdef"
+    torch.compiled_with_cxx11_abi = lambda: True
     torch.utils = torch_utils
 
     monkeypatch.setitem(sys.modules, "setuptools", setuptools)
@@ -142,4 +143,38 @@ def test_build_commands_generate_torch_build_info(monkeypatch, tmp_path, command
     build_info = runpy.run_path(str(build_info_path))
     assert build_info["BUILD_TORCH_VERSION"] == "2.13.0a0+gitabcdef"
     assert build_info["BUILD_TORCH_MAJOR_MINOR"] == "2.13"
+    assert build_info["BUILD_TORCH_CXX11_ABI"] is True
     assert captured[f"{command_name}_run"] is True
+
+
+@pytest.mark.parametrize(
+    ("compiled_with_cxx11_abi", "message"),
+    [
+        (None, "torch.compiled_with_cxx11_abi is unavailable"),
+        (lambda: 1, r"torch.compiled_with_cxx11_abi\(\) returned 1"),
+    ],
+)
+def test_build_commands_require_a_boolean_torch_cxx11_abi(
+    monkeypatch,
+    tmp_path,
+    compiled_with_cxx11_abi,
+    message,
+):
+    infini_ops_include_dir = tmp_path / "infiniops" / "include"
+    infini_rt_include_dir = tmp_path / "infinirt" / "include"
+    infini_ops_include_dir.mkdir(parents=True)
+    infini_rt_include_dir.mkdir(parents=True)
+    monkeypatch.setenv("INFINI_OPS_INCLUDE_DIRS", str(infini_ops_include_dir))
+    monkeypatch.setenv("INFINI_RT_INCLUDE_DIRS", str(infini_rt_include_dir))
+
+    captured = _run_setup(monkeypatch)
+    command = captured["setup"]["cmdclass"]["build_py"]
+    command.run.__globals__["torch"].compiled_with_cxx11_abi = compiled_with_cxx11_abi
+    package_root = tmp_path / "package-root"
+    (package_root / "torch_infini").mkdir(parents=True)
+    command.run.__globals__["PACKAGE_ROOT"] = package_root
+
+    with pytest.raises(RuntimeError, match=message):
+        command().run()
+
+    assert "build_py_run" not in captured

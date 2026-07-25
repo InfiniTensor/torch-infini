@@ -161,6 +161,10 @@ jobs:
           assert _build_info.BUILD_TORCH_MAJOR_MINOR == ".".join(
               torch.__version__.split(".")[:2]
           )
+          assert (
+              _build_info.BUILD_TORCH_CXX11_ABI
+              is torch.compiled_with_cxx11_abi()
+          )
           assert torch_infini._C._runtime_backend_name() == "cpu"
           assert torch.infini.is_available()
           assert torch.infini.device_count() > 0
