@@ -166,6 +166,7 @@ setup(
                 "csrc/host_allocator.cpp",
                 "csrc/infini_ops.cpp",
                 "csrc/init.cpp",
+                "csrc/mm.cpp",
                 "csrc/runtime.cpp",
                 "csrc/stream.cpp",
             ],

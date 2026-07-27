@@ -86,6 +86,8 @@ def assert_operator_matches_cpu(
     error_match: str | None = None,
     copy_storage_from_cpu: StorageCopier | None = None,
     copy_storage_to_cpu: StorageCopier | None = None,
+    rtol: float | None = None,
+    atol: float | None = None,
 ) -> None:
     expected = invoke(case, "cpu")
     actual = invoke(case, device, copy_storage_from_cpu)
@@ -121,6 +123,8 @@ def assert_operator_matches_cpu(
         actual.tensor,
         device,
         copy_storage_to_cpu,
+        rtol=rtol,
+        atol=atol,
     )
 
 
@@ -130,6 +134,9 @@ def assert_tensor_matches_cpu(
     actual: torch.Tensor,
     device: str = "infini",
     copy_storage_to_cpu: StorageCopier | None = None,
+    *,
+    rtol: float | None = None,
+    atol: float | None = None,
 ) -> None:
     expected_device_type = torch.device(device).type
     if actual.device.type != expected_device_type:
@@ -146,7 +153,14 @@ def assert_tensor_matches_cpu(
             f"CPU: {expected_metadata}\n"
             f"{device}: {actual_metadata}"
         )
-    assert_tensor_values_match(case_name, expected, actual, copy_storage_to_cpu)
+    assert_tensor_values_match(
+        case_name,
+        expected,
+        actual,
+        copy_storage_to_cpu,
+        rtol=rtol,
+        atol=atol,
+    )
 
 
 def assert_tensor_values_match(
@@ -154,10 +168,15 @@ def assert_tensor_values_match(
     expected: torch.Tensor,
     actual: torch.Tensor,
     copy_storage_to_cpu: StorageCopier | None = None,
+    *,
+    rtol: float | None = None,
+    atol: float | None = None,
 ) -> None:
     torch.testing.assert_close(
         _copy_result_to_cpu(actual, copy_storage_to_cpu),
         expected,
+        rtol=rtol,
+        atol=atol,
         msg=lambda message: f"{case_name}: output values differ\n{message}",
     )
 
