@@ -1,9 +1,10 @@
+import gc
 import threading
 
 import pytest
 import torch
 
-import torch_infini  # noqa: F401
+import torch_infini
 
 
 def _to_infini(tensor, device="infini"):
@@ -174,3 +175,67 @@ def test_add_tensor_uses_current_nondefault_stream():
 
     stream.synchronize()
     torch.testing.assert_close(_to_cpu(result), lhs_cpu + rhs_cpu)
+
+
+def test_add_tensor_records_storage_on_current_stream(
+    infini_ops_test_module,
+):
+    lhs = _to_infini(torch.ones(16, dtype=torch.float32))
+    rhs = _to_infini(torch.ones(16, dtype=torch.float32))
+    stream = torch.infini.Stream()
+
+    with torch.infini.stream(stream):
+        result = torch.add(lhs, rhs)
+        recorded = [
+            infini_ops_test_module.allocation_records_current_stream(tensor)
+            for tensor in (lhs, rhs, result)
+        ]
+
+    assert recorded == [True, True, True]
+    stream.synchronize()
+
+
+@pytest.mark.parametrize("released", ["lhs", "rhs", "output"])
+def test_add_tensor_storage_release_waits_for_current_stream(released):
+    if torch_infini._C._runtime_backend_name() == "cpu":
+        pytest.skip("requires an asynchronous accelerator Add implementation")
+
+    numel = 16 * 1024 * 1024
+    lhs = _to_infini(torch.ones(numel, dtype=torch.float32))
+    rhs = _to_infini(torch.ones(numel, dtype=torch.float32))
+    stream = torch.infini.Stream()
+
+    with torch.infini.stream(stream):
+        result = torch.add(lhs, rhs)
+
+    if stream.query():
+        pytest.skip("add completed before storage lifetime could be observed")
+
+    if released == "lhs":
+        del lhs
+    elif released == "rhs":
+        del rhs
+    else:
+        del result
+    gc.collect()
+
+    assert stream.query()
+
+
+def test_add_tensor_with_external_storage_synchronizes_before_return(
+    infini_ops_test_module,
+):
+    numel = 16 if torch_infini._C._runtime_backend_name() == "cpu" else 16 * 1024 * 1024
+    allocation = _to_infini(torch.ones(numel, dtype=torch.float32))
+    lhs = infini_ops_test_module.with_alternative_context(allocation)
+    del allocation
+    gc.collect()
+    rhs = _to_infini(torch.ones(numel, dtype=torch.float32))
+    stream = torch.infini.Stream()
+
+    with torch.infini.stream(stream):
+        assert not infini_ops_test_module.allocation_records_current_stream(lhs)
+        result = torch.add(lhs, rhs)
+
+    assert stream.query()
+    torch.testing.assert_close(_to_cpu(result), torch.full((numel,), 2.0))

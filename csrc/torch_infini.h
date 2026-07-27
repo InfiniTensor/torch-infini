@@ -154,6 +154,10 @@ void* get_native_stream_handle(c10::Stream stream);
 void submit_stream_work(
     const c10::Stream& stream,
     const std::function<void(rt::Stream)>& submit);
+void submit_stream_work(
+    const c10::Stream& stream,
+    at::TensorList tensors,
+    const std::function<void(rt::Stream)>& submit);
 void run_synchronous_stream_work(
     const c10::Stream& stream,
     const std::function<void()>& work);
@@ -181,6 +185,9 @@ bool can_record_allocation_stream(
     const at::Tensor& tensor,
     const c10::Stream& stream);
 void record_allocation_stream(
+    const at::Tensor& tensor,
+    const c10::Stream& stream);
+bool is_allocation_stream_recorded(
     const at::Tensor& tensor,
     const c10::Stream& stream);
 bool record_host_allocation_stream(
