@@ -157,6 +157,7 @@ setup(
             sources=[
                 "csrc/add.cpp",
                 "csrc/allocator.cpp",
+                "csrc/as_strided.cpp",
                 "csrc/copy.cpp",
                 "csrc/device_guard.cpp",
                 "csrc/empty.cpp",

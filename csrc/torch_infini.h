@@ -212,6 +212,12 @@ at::Tensor empty_strided(
     std::optional<c10::Device> device,
     std::optional<bool> pin_memory);
 
+at::Tensor as_strided(
+    const at::Tensor& self,
+    c10::SymIntArrayRef size,
+    c10::SymIntArrayRef stride,
+    std::optional<c10::SymInt> storage_offset);
+
 at::Tensor& copy_(at::Tensor& self, const at::Tensor& src, bool non_blocking);
 
 at::Tensor add(
