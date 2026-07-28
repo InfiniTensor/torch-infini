@@ -22,8 +22,8 @@ torch.testing.assert_close(out, src + src)
 This first-step bridge is intentionally narrow. It wires PyTorch device and
 stream management, device and pinned-host allocation, synchronization,
 contiguous tensor copies, shared ATen tensor metadata adapters, and
-`aten::add.Tensor` and `aten::mm` to the Infini stack. General ATen operator
-coverage is left to later integration work.
+`aten::add.Tensor`, `aten::mm`, and `aten::addmm` to the Infini stack. General
+ATen operator coverage is left to later integration work.
 
 The implementation follows PyTorch's documented out-of-tree backend path:
 `PrivateUse1` is renamed to `infini`, C++ kernels are registered through the
@@ -164,9 +164,9 @@ The initial implementation supports:
 - internal ATen-to-InfiniRT TensorView and InfiniOps execution-context adapters
 - same-dtype, same-device `torch.add(tensor, tensor)` through native InfiniOps
   implementation index 0, including broadcasted and strided inputs
-- two-dimensional `float32` `torch.mm` and `nn.Linear(..., bias=False)`
-  inference through native InfiniOps Gemm implementation index 0, including
-  contiguous inputs and transposed dense weights
+- two-dimensional `float32` `torch.mm`, `torch.addmm`, and `nn.Linear`
+  inference through native InfiniOps implementation index 0, including
+  contiguous inputs, transposed dense weights, and broadcast bias
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
 device and stream-management operations it implements. Stream priorities,
@@ -184,8 +184,11 @@ operations are validated with the InfiniRT CPU and NVIDIA backends; other
 backends require corresponding InfiniRT event support. The initial tensor Add
 path requires `alpha == 1` and does not perform dtype promotion. The initial
 matrix multiplication path is limited to two-dimensional `float32`
-non-overlapping dense inputs and does not provide `mm.out`, bias, training, or
-backward support. On NVIDIA, it follows the InfiniOps TF32 path and matches
-PyTorch's default `high` float32 matrix-multiplication precision; selecting
-`highest` precision does not yet change InfiniOps execution. Unsupported
-operations should fail clearly instead of silently falling back through CPU.
+non-overlapping dense matrix inputs. The initial `addmm` path composes InfiniOps
+Gemm and Add and requires `alpha == 1` and `beta == 1`; it enables two-dimensional
+`nn.Linear` inference with or without bias. The path does not provide `mm.out`,
+`addmm.out`, training, or backward support. On NVIDIA, it follows the InfiniOps
+TF32 path and matches PyTorch's default `high` float32 matrix-multiplication
+precision; selecting `highest` precision does not yet change InfiniOps
+execution. Unsupported operations should fail clearly instead of silently
+falling back through CPU.

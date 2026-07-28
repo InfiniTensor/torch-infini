@@ -38,3 +38,32 @@ def test_bias_free_linear_inference_matches_cpu() -> None:
         expected,
         **TF32_TOLERANCE,
     )
+
+
+def test_linear_inference_with_bias_matches_cpu() -> None:
+    model = torch.nn.Linear(4, 3, bias=True).eval()
+    input_cpu = torch.linspace(-2.0, 3.0, steps=20, dtype=torch.float32).reshape(5, 4)
+    with torch.no_grad():
+        model.weight.copy_(
+            torch.linspace(-1.5, 2.0, steps=12, dtype=torch.float32).reshape(3, 4)
+        )
+        model.bias.copy_(torch.tensor([-1.25, 0.5, 2.0], dtype=torch.float32))
+        expected = model(input_cpu)
+
+    model = model.to("infini")
+    model.eval()
+    input_infini = input_cpu.to("infini")
+    with torch.no_grad():
+        result = model(input_infini)
+
+    assert not model.training
+    assert model.bias is not None
+    assert model.weight.device.type == "infini"
+    assert model.bias.device.type == "infini"
+    assert result.device.type == "infini"
+    assert not result.requires_grad
+    torch.testing.assert_close(
+        _copy_to_cpu(result),
+        expected,
+        **TF32_TOLERANCE,
+    )

@@ -156,6 +156,7 @@ setup(
             name="torch_infini._C",
             sources=[
                 "csrc/add.cpp",
+                "csrc/addmm.cpp",
                 "csrc/allocator.cpp",
                 "csrc/as_strided.cpp",
                 "csrc/copy.cpp",
