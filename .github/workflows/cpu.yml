@@ -127,7 +127,7 @@ jobs:
             -DWITH_CPU=ON \
             -DWITH_TORCH=OFF \
             -DGENERATE_OPERATOR_CALL_INSTANTIATIONS=ON \
-            -DINFINI_OPS_OPS=add
+            -DINFINI_OPS_OPS=add,gemm
           cmake --build "$RUNNER_TEMP/InfiniOps/build" \
             --target infiniops \
             --parallel 2

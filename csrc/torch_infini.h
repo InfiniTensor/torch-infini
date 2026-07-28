@@ -225,6 +225,8 @@ at::Tensor add(
     const at::Tensor& other,
     const at::Scalar& alpha);
 
+at::Tensor mm(const at::Tensor& self, const at::Tensor& mat2);
+
 } // namespace torch_infini
 
 #endif // TORCH_INFINI_TORCH_INFINI_H_
