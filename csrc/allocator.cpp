@@ -112,6 +112,21 @@ void record_allocation_stream(
   }
 }
 
+bool is_allocation_stream_recorded(
+    const at::Tensor& tensor,
+    const c10::Stream& stream) {
+  if (!can_record_allocation_stream(tensor, stream)) {
+    return false;
+  }
+  const auto& data_ptr = tensor.storage().data_ptr();
+  auto* allocation = static_cast<AllocationContext*>(data_ptr.get_context());
+
+  const std::lock_guard<std::mutex> lock{allocation->mutex};
+  return std::find(
+             allocation->streams.begin(), allocation->streams.end(), stream) !=
+      allocation->streams.end();
+}
+
 REGISTER_ALLOCATOR(c10::DeviceType::PrivateUse1, &g_allocator);
 
 } // namespace torch_infini

@@ -1,3 +1,4 @@
+#include <ATen/ops/from_blob.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <torch/extension.h>
@@ -9,8 +10,10 @@
 #include <cstdint>
 #include <exception>
 #include <future>
+#include <stdexcept>
 #include <string>
 #include <thread>
+#include <utility>
 
 #include "infini_ops.h"
 #include "torch_infini.h"
@@ -55,8 +58,7 @@ py::dict runtime_capability_policy() {
     py::dict entry;
     entry["async_memcpy"] = capabilities.async_memcpy;
     entry["events"] = capabilities.events;
-    entry["pinned_host_allocation"] =
-        capabilities.pinned_host_allocation;
+    entry["pinned_host_allocation"] = capabilities.pinned_host_allocation;
     entry["async_allocation"] = capabilities.async_allocation;
     entry["async_free"] = capabilities.async_free;
     policy[py::str(infini::rt::Device::StringFromType(device_type))] = entry;
@@ -100,6 +102,51 @@ py::dict current_execution_context_metadata(const std::string& device_name) {
       reinterpret_cast<std::uintptr_t>(context.handle.stream());
   metadata["implementation_index"] = context.config.implementation_index();
   return metadata;
+}
+
+bool allocation_records_current_stream(const at::Tensor& tensor) {
+  const auto stream = torch_infini::get_current_stream(tensor.device());
+  return torch_infini::is_allocation_stream_recorded(tensor, stream);
+}
+
+at::Tensor with_alternative_context(const at::Tensor& tensor) {
+  auto owner = tensor;
+  return at::from_blob(
+      tensor.data_ptr(),
+      tensor.sizes(),
+      tensor.strides(),
+      [owner = std::move(owner)](void*) mutable { owner = at::Tensor{}; },
+      tensor.options(),
+      tensor.device());
+}
+
+void submit_copy_then_fail(at::Tensor destination, const at::Tensor& source) {
+  TORCH_CHECK(
+      destination.device() == source.device(),
+      "source and destination must use the same device");
+  TORCH_CHECK(
+      destination.scalar_type() == source.scalar_type() &&
+          destination.sizes().equals(source.sizes()) &&
+          destination.is_contiguous() && source.is_contiguous(),
+      "source and destination must be matching contiguous tensors");
+
+  const auto stream = torch_infini::get_current_stream(destination.device());
+  const auto nbytes = static_cast<std::size_t>(destination.numel()) *
+      static_cast<std::size_t>(destination.element_size());
+  torch_infini::submit_stream_work(
+      stream,
+      {destination, source},
+      [&](torch_infini::rt::Stream native_stream) {
+        torch_infini::check(
+            torch_infini::rt::MemcpyAsync(
+                destination.data_ptr(),
+                source.data_ptr(),
+                nbytes,
+                torch_infini::rt::kMemcpyDeviceToDevice,
+                native_stream),
+            "MemcpyAsync(DeviceToDevice)");
+        throw std::runtime_error{"submission failed after enqueue"};
+      });
 }
 
 bool stream_synchronize_waits_for_submission(const std::string& device_name) {
@@ -285,6 +332,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def(
       "current_execution_context_metadata",
       &current_execution_context_metadata);
+  m.def(
+      "allocation_records_current_stream", &allocation_records_current_stream);
+  m.def("with_alternative_context", &with_alternative_context);
+  m.def("submit_copy_then_fail", &submit_copy_then_fail);
   m.def(
       "stream_synchronize_waits_for_submission",
       &stream_synchronize_waits_for_submission);

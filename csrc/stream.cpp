@@ -258,6 +258,31 @@ void submit_stream_work(
   stream_registry().submit(stream, submit);
 }
 
+void submit_stream_work(
+    const c10::Stream& stream,
+    at::TensorList tensors,
+    const std::function<void(rt::Stream)>& submit) {
+  bool requires_synchronization = false;
+  for (const auto& tensor : tensors) {
+    if (can_record_allocation_stream(tensor, stream)) {
+      record_allocation_stream(tensor, stream);
+    } else {
+      requires_synchronization = true;
+    }
+  }
+
+  try {
+    submit_stream_work(stream, submit);
+  } catch (...) {
+    synchronize_stream(stream);
+    throw;
+  }
+
+  if (requires_synchronization) {
+    synchronize_stream(stream);
+  }
+}
+
 void run_synchronous_stream_work(
     const c10::Stream& stream,
     const std::function<void()>& work) {

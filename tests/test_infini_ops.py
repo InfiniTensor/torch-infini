@@ -3,6 +3,8 @@ import os
 import pytest
 import torch
 
+import torch_infini
+
 ALL_OPTIONAL_CAPABILITIES = {
     "async_memcpy": True,
     "events": True,
@@ -177,6 +179,29 @@ def test_stream_submission_waits_for_synchronous_work(infini_ops_test_module):
     assert infini_ops_test_module.stream_submission_waits_for_synchronous_work(
         "infini:0"
     )
+
+
+def test_failed_tensor_submission_drains_enqueued_work(infini_ops_test_module):
+    if torch_infini._C._runtime_backend_name() == "cpu":
+        pytest.skip("requires asynchronous device-to-device copies")
+
+    numel = 16 * 1024 * 1024
+    expected = torch.arange(numel, dtype=torch.float32)
+    source = torch.empty_like(expected, device="infini")
+    source.copy_(expected)
+    destination = torch.empty_like(source)
+    stream = torch.infini.Stream()
+
+    with (
+        torch.infini.stream(stream),
+        pytest.raises(RuntimeError, match="submission failed after enqueue"),
+    ):
+        infini_ops_test_module.submit_copy_then_fail(destination, source)
+
+    assert stream.query()
+    actual = torch.empty_like(expected)
+    actual.copy_(destination)
+    torch.testing.assert_close(actual, expected)
 
 
 def test_add_tensor_supports_noncontiguous_inputs(infini_ops_test_module):
