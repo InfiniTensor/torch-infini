@@ -156,6 +156,7 @@ The initial implementation supports:
 - event record, query, synchronize, elapsed-time, and stream-wait operations
 - `torch.empty(..., device="infini")`
 - `torch.empty_strided(..., device="infini")`
+- storage-sharing `torch.as_strided` and matrix-transpose metadata views
 - `Tensor.pin_memory("infini")` and `Storage.pin_memory("infini")`
 - contiguous `copy_` between CPU and Infini tensors, with asynchronous return
   for pinned CPU memory when `non_blocking=True` and the selected InfiniRT
