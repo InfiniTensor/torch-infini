@@ -171,6 +171,7 @@ setup(
                 "csrc/relu.cpp",
                 "csrc/runtime.cpp",
                 "csrc/stream.cpp",
+                "csrc/view.cpp",
             ],
             include_dirs=[*include_dirs, str(PACKAGE_ROOT / "csrc")],
             libraries=[],

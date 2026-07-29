@@ -22,8 +22,9 @@ torch.testing.assert_close(out, src + src)
 This first-step bridge is intentionally narrow. It wires PyTorch device and
 stream management, device and pinned-host allocation, synchronization,
 contiguous tensor copies, shared ATen tensor metadata adapters, and
-`aten::add.Tensor`, `aten::mm`, `aten::addmm`, and `aten::relu` to the Infini
-stack. General ATen operator coverage is left to later integration work.
+`aten::view`, `aten::add.Tensor`, `aten::mm`, `aten::addmm`, and `aten::relu` to
+the Infini stack. General ATen operator coverage is left to later integration
+work.
 
 The implementation follows PyTorch's documented out-of-tree backend path:
 `PrivateUse1` is renamed to `infini`, C++ kernels are registered through the
@@ -156,7 +157,8 @@ The initial implementation supports:
 - event record, query, synchronize, elapsed-time, and stream-wait operations
 - `torch.empty(..., device="infini")`
 - `torch.empty_strided(..., device="infini")`
-- storage-sharing `torch.as_strided` and matrix-transpose metadata views
+- storage-sharing `torch.as_strided`, `Tensor.view(shape)`, and matrix-transpose
+  metadata views, including view-compatible `reshape` and `nn.Flatten`
 - `Tensor.pin_memory("infini")` and `Storage.pin_memory("infini")`
 - contiguous `copy_` between CPU and Infini tensors, with asynchronous return
   for pinned CPU memory when `non_blocking=True` and the selected InfiniRT
@@ -178,6 +180,8 @@ The initial implementation supports:
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
 device and stream-management operations it implements. Stream priorities,
 random-number generation, and other general ATen operators are not exposed yet.
+`reshape` operations that require materializing a contiguous copy are not
+supported yet.
 For CPU-to-Infini and Infini-to-CPU copies, `non_blocking=True` returns before
 completion only when the CPU tensor uses torch-infini pinned memory and the
 selected backend supports both pinned-host allocation and asynchronous memcpy.
