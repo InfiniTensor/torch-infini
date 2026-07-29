@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 import torch_infini  # noqa: F401
@@ -60,6 +61,44 @@ def test_linear_inference_with_bias_matches_cpu() -> None:
     assert model.bias is not None
     assert model.weight.device.type == "infini"
     assert model.bias.device.type == "infini"
+    assert result.device.type == "infini"
+    assert not result.requires_grad
+    torch.testing.assert_close(
+        _copy_to_cpu(result),
+        expected,
+        **TF32_TOLERANCE,
+    )
+
+
+@pytest.mark.parametrize(
+    "bias",
+    [False, True],
+    ids=("without-bias", "with-bias"),
+)
+def test_batched_linear_inference_matches_cpu(bias: bool) -> None:
+    model = torch.nn.Linear(4, 3, bias=bias).eval()
+    input_cpu = torch.linspace(-2.0, 3.0, steps=24, dtype=torch.float32).reshape(
+        2, 3, 4
+    )
+    with torch.no_grad():
+        model.weight.copy_(
+            torch.linspace(-1.5, 2.0, steps=12, dtype=torch.float32).reshape(3, 4)
+        )
+        if model.bias is not None:
+            model.bias.copy_(torch.tensor([-1.25, 0.5, 2.0], dtype=torch.float32))
+        expected = model(input_cpu)
+
+    model = model.to("infini")
+    input_infini = input_cpu.to("infini")
+    with torch.no_grad():
+        result = model(input_infini)
+
+    assert not model.training
+    assert (model.bias is not None) is bias
+    assert model.weight.device.type == "infini"
+    if model.bias is not None:
+        assert model.bias.device.type == "infini"
+    assert result.shape == (2, 3, 3)
     assert result.device.type == "infini"
     assert not result.requires_grad
     torch.testing.assert_close(
