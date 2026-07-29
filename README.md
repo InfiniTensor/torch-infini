@@ -166,15 +166,17 @@ The initial implementation supports:
 - internal ATen-to-InfiniRT TensorView and InfiniOps execution-context adapters
 - same-dtype, same-device `torch.add(tensor, tensor)` through native InfiniOps
   implementation index 0, including broadcasted and strided inputs
-- two-dimensional `float32` `torch.mm`, `torch.addmm`, and `nn.Linear`
-  inference through native InfiniOps implementation index 0, including
-  contiguous inputs, transposed dense weights, and broadcast bias
+- two-dimensional `float32` `torch.mm` and `torch.addmm` inference through
+  native InfiniOps implementation index 0, plus `nn.Linear` inference for
+  matrix inputs and contiguous `[batch, sequence, hidden]` inputs, including
+  transposed dense weights and broadcast bias
 - out-of-place `torch.relu` and `nn.ReLU` inference through native InfiniOps
   implementation index 0 on CPU, NVIDIA, Iluvatar, MetaX, and Moore, including
   supported floating-point and integer dtypes and PyTorch-compatible output
   layouts
 - end-to-end `float32` inference for two-layer `nn.Sequential` MLPs composed of
-  `nn.Linear`, `nn.ReLU`, and `nn.Linear` on the ReLU-enabled runtime backends
+  `nn.Linear`, `nn.ReLU`, and `nn.Linear`, with matrix or contiguous
+  `[batch, sequence, hidden]` inputs, on the ReLU-enabled runtime backends
   listed above
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
@@ -195,14 +197,15 @@ operations are validated with the InfiniRT CPU and NVIDIA backends; other
 backends require corresponding InfiniRT event support. The initial tensor Add
 path requires `alpha == 1` and does not perform dtype promotion. The initial
 matrix multiplication path is limited to two-dimensional `float32`
-non-overlapping dense matrix inputs. The initial `addmm` path composes InfiniOps
-Gemm and Add and requires `alpha == 1` and `beta == 1`; it enables two-dimensional
-`nn.Linear` inference with or without bias. The path does not provide `mm.out`,
-`addmm.out`, training, or backward support. On NVIDIA, it follows the InfiniOps
-TF32 path and matches PyTorch's default `high` float32 matrix-multiplication
-precision; selecting `highest` precision does not yet change InfiniOps
-execution. The initial ReLU path does not provide `relu_`, an out overload, or
-backward support. InfiniOps does not yet provide native ReLU implementation 0
-for Cambricon or Ascend, so torch-infini reports those runtime backends as
-unsupported for this operator. Unsupported operations should fail clearly
-instead of silently falling back through CPU.
+non-overlapping dense matrix inputs. PyTorch's composite `nn.Linear` path uses
+these matrix kernels and metadata views to support contiguous three-dimensional
+inputs with or without bias. The initial `addmm` path composes InfiniOps Gemm and
+Add and requires `alpha == 1` and `beta == 1`. The path does not provide
+`mm.out`, `addmm.out`, training, or backward support. On NVIDIA, it follows the
+InfiniOps TF32 path and matches PyTorch's default `high` float32
+matrix-multiplication precision; selecting `highest` precision does not yet
+change InfiniOps execution. The initial ReLU path does not provide `relu_`, an
+out overload, or backward support. InfiniOps does not yet provide native ReLU
+implementation 0 for Cambricon or Ascend, so torch-infini reports those runtime
+backends as unsupported for this operator. Unsupported operations should fail
+clearly instead of silently falling back through CPU.

@@ -13,21 +13,12 @@ def _copy_to_cpu(tensor: torch.Tensor) -> torch.Tensor:
     return result
 
 
-def test_tiny_mlp_inference_matches_cpu() -> None:
+def _make_tiny_mlp() -> torch.nn.Sequential:
     model = torch.nn.Sequential(
         torch.nn.Linear(4, 5),
         torch.nn.ReLU(),
         torch.nn.Linear(5, 3),
     ).eval()
-    input_cpu = torch.tensor(
-        (
-            (-2.0, -1.0, 0.0, 1.0),
-            (0.5, -0.5, 2.0, -3.0),
-            (4.0, 1.0, -2.0, 0.25),
-        ),
-        dtype=torch.float32,
-    )
-
     with torch.no_grad():
         model[0].weight.copy_(
             torch.tensor(
@@ -55,7 +46,25 @@ def test_tiny_mlp_inference_matches_cpu() -> None:
             )
         )
         model[2].bias.copy_(torch.tensor((0.1, -0.2, 0.3), dtype=torch.float32))
+    return model
 
+
+def _make_input() -> torch.Tensor:
+    return torch.tensor(
+        (
+            (-2.0, -1.0, 0.0, 1.0),
+            (0.5, -0.5, 2.0, -3.0),
+            (4.0, 1.0, -2.0, 0.25),
+        ),
+        dtype=torch.float32,
+    )
+
+
+def test_tiny_mlp_inference_matches_cpu() -> None:
+    model = _make_tiny_mlp()
+    input_cpu = _make_input()
+
+    with torch.no_grad():
         hidden = model[0](input_cpu)
         assert torch.any(hidden < 0)
         assert torch.any(hidden > 0)
@@ -68,6 +77,30 @@ def test_tiny_mlp_inference_matches_cpu() -> None:
 
     assert not model.training
     assert all(parameter.device.type == "infini" for parameter in model.parameters())
+    assert result.device.type == "infini"
+    assert not result.requires_grad
+    torch.testing.assert_close(
+        _copy_to_cpu(result),
+        expected,
+        **TF32_TOLERANCE,
+    )
+
+
+def test_batched_tiny_mlp_inference_matches_cpu() -> None:
+    model = _make_tiny_mlp()
+    base_input = _make_input()
+    input_cpu = torch.stack((base_input, -0.5 * base_input.flip(0)))
+    with torch.no_grad():
+        expected = model(input_cpu)
+
+    model = model.to("infini")
+    input_infini = input_cpu.to("infini")
+    with torch.no_grad():
+        result = model(input_infini)
+
+    assert not model.training
+    assert all(parameter.device.type == "infini" for parameter in model.parameters())
+    assert result.shape == (2, 3, 3)
     assert result.device.type == "infini"
     assert not result.requires_grad
     torch.testing.assert_close(
