@@ -243,6 +243,12 @@ at::Tensor mm(const at::Tensor& self, const at::Tensor& mat2);
 
 at::Tensor relu(const at::Tensor& self);
 
+at::Tensor rms_norm(
+    const at::Tensor& input,
+    c10::SymIntArrayRef normalized_shape,
+    const std::optional<at::Tensor>& weight,
+    std::optional<double> eps);
+
 } // namespace torch_infini
 
 #endif // TORCH_INFINI_TORCH_INFINI_H_
