@@ -171,6 +171,9 @@ The initial implementation supports:
   implementation index 0 on CPU, NVIDIA, Iluvatar, MetaX, and Moore, including
   supported floating-point and integer dtypes and PyTorch-compatible output
   layouts
+- end-to-end `float32` inference for two-layer `nn.Sequential` MLPs composed of
+  `nn.Linear`, `nn.ReLU`, and `nn.Linear` on the ReLU-enabled runtime backends
+  listed above
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
 device and stream-management operations it implements. Stream priorities,
