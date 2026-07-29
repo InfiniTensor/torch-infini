@@ -22,8 +22,8 @@ torch.testing.assert_close(out, src + src)
 This first-step bridge is intentionally narrow. It wires PyTorch device and
 stream management, device and pinned-host allocation, synchronization,
 contiguous tensor copies, shared ATen tensor metadata adapters, and
-`aten::add.Tensor`, `aten::mm`, and `aten::addmm` to the Infini stack. General
-ATen operator coverage is left to later integration work.
+`aten::add.Tensor`, `aten::mm`, `aten::addmm`, and `aten::relu` to the Infini
+stack. General ATen operator coverage is left to later integration work.
 
 The implementation follows PyTorch's documented out-of-tree backend path:
 `PrivateUse1` is renamed to `infini`, C++ kernels are registered through the
@@ -42,7 +42,7 @@ cmake -S /path/to/InfiniOps -B /tmp/infini-ops-build \
   -DWITH_CPU=ON \
   -DWITH_TORCH=OFF \
   -DGENERATE_OPERATOR_CALL_INSTANTIATIONS=ON \
-  -DINFINI_OPS_OPS=add,gemm
+  -DINFINI_OPS_OPS=add,gemm,relu
 cmake --build /tmp/infini-ops-build --target infiniops -j
 cmake --install /tmp/infini-ops-build
 ```
@@ -84,7 +84,7 @@ CUDA; InfiniRT should eventually export any required transitive include paths.
 Source-build compatibility is tested for every combination of Python 3.10,
 3.11, and 3.12 with PyTorch 2.12 and 2.13. The tested native dependencies are
 InfiniRT commit `95c70080f9551e61241110497d163dfcdf9dc7e7` and InfiniOps commit
-`296271487beb594a248fd463e5fff14f7ab74293`.
+`64f29847bb8a4445efe8d55759a035050c7d1bfa`.
 
 Binary wheel builds, editable builds, and in-place builds record the full
 PyTorch version, normalized major.minor version, and CXX11 ABI mode used to
@@ -167,6 +167,10 @@ The initial implementation supports:
 - two-dimensional `float32` `torch.mm`, `torch.addmm`, and `nn.Linear`
   inference through native InfiniOps implementation index 0, including
   contiguous inputs, transposed dense weights, and broadcast bias
+- out-of-place `torch.relu` and `nn.ReLU` inference through native InfiniOps
+  implementation index 0 on CPU, NVIDIA, Iluvatar, MetaX, and Moore, including
+  supported floating-point and integer dtypes and PyTorch-compatible output
+  layouts
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
 device and stream-management operations it implements. Stream priorities,
@@ -190,5 +194,8 @@ Gemm and Add and requires `alpha == 1` and `beta == 1`; it enables two-dimension
 `addmm.out`, training, or backward support. On NVIDIA, it follows the InfiniOps
 TF32 path and matches PyTorch's default `high` float32 matrix-multiplication
 precision; selecting `highest` precision does not yet change InfiniOps
-execution. Unsupported operations should fail clearly instead of silently
-falling back through CPU.
+execution. The initial ReLU path does not provide `relu_`, an out overload, or
+backward support. InfiniOps does not yet provide native ReLU implementation 0
+for Cambricon or Ascend, so torch-infini reports those runtime backends as
+unsupported for this operator. Unsupported operations should fail clearly
+instead of silently falling back through CPU.
