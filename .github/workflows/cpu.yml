@@ -50,7 +50,7 @@ jobs:
             artifact_name: torch-cuda-api-gaps-python-3.12-pytorch-2.12
     env:
       INFINIRT_COMMIT: 95c70080f9551e61241110497d163dfcdf9dc7e7
-      INFINIOPS_COMMIT: 296271487beb594a248fd463e5fff14f7ab74293
+      INFINIOPS_COMMIT: 64f29847bb8a4445efe8d55759a035050c7d1bfa
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
       PYTORCH_VERSION: ${{ matrix.pytorch_version }}
     steps:
@@ -127,7 +127,7 @@ jobs:
             -DWITH_CPU=ON \
             -DWITH_TORCH=OFF \
             -DGENERATE_OPERATOR_CALL_INSTANTIATIONS=ON \
-            -DINFINI_OPS_OPS=add,gemm
+            -DINFINI_OPS_OPS=add,gemm,relu
           cmake --build "$RUNNER_TEMP/InfiniOps/build" \
             --target infiniops \
             --parallel 2
