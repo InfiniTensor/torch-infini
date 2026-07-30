@@ -169,6 +169,7 @@ setup(
                 "csrc/init.cpp",
                 "csrc/mm.cpp",
                 "csrc/relu.cpp",
+                "csrc/rms_norm.cpp",
                 "csrc/runtime.cpp",
                 "csrc/stream.cpp",
                 "csrc/view.cpp",

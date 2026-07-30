@@ -22,9 +22,9 @@ torch.testing.assert_close(out, src + src)
 This first-step bridge is intentionally narrow. It wires PyTorch device and
 stream management, device and pinned-host allocation, synchronization,
 contiguous tensor copies, shared ATen tensor metadata adapters, and
-`aten::view`, `aten::add.Tensor`, `aten::mm`, `aten::addmm`, and `aten::relu` to
-the Infini stack. General ATen operator coverage is left to later integration
-work.
+`aten::view`, `aten::add.Tensor`, `aten::mm`, `aten::addmm`, `aten::relu`, and
+`aten::rms_norm` to the Infini stack. General ATen operator coverage is left to
+later integration work.
 
 The implementation follows PyTorch's documented out-of-tree backend path:
 `PrivateUse1` is renamed to `infini`, C++ kernels are registered through the
@@ -43,7 +43,7 @@ cmake -S /path/to/InfiniOps -B /tmp/infini-ops-build \
   -DWITH_CPU=ON \
   -DWITH_TORCH=OFF \
   -DGENERATE_OPERATOR_CALL_INSTANTIATIONS=ON \
-  -DINFINI_OPS_OPS=add,gemm,relu
+  -DINFINI_OPS_OPS=add,gemm,relu,rms_norm
 cmake --build /tmp/infini-ops-build --target infiniops -j
 cmake --install /tmp/infini-ops-build
 ```
@@ -174,6 +174,9 @@ The initial implementation supports:
   implementation index 0 on CPU, NVIDIA, Iluvatar, MetaX, and Moore, including
   supported floating-point and integer dtypes and PyTorch-compatible output
   layouts
+- `float32` `torch.nn.functional.rms_norm` and `nn.RMSNorm` inference through
+  native InfiniOps implementation index 0 for contiguous two-dimensional and
+  three-dimensional inputs with one normalized dimension and an affine weight
 - end-to-end `float32` inference for two-layer `nn.Sequential` MLPs composed of
   `nn.Linear`, `nn.ReLU`, and `nn.Linear`, with matrix or contiguous
   `[batch, sequence, hidden]` inputs, on the ReLU-enabled runtime backends
@@ -207,5 +210,9 @@ matrix-multiplication precision; selecting `highest` precision does not yet
 change InfiniOps execution. The initial ReLU path does not provide `relu_`, an
 out overload, or backward support. InfiniOps does not yet provide native ReLU
 implementation 0 for Cambricon or Ascend, so torch-infini reports those runtime
-backends as unsupported for this operator. Unsupported operations should fail
-clearly instead of silently falling back through CPU.
+backends as unsupported for this operator. The initial RMSNorm path does not
+support noncontiguous inputs, more than one normalized dimension, non-float32
+dtypes, missing affine weights, an out overload, or backward. Its CPU and NVIDIA
+paths are validated here; other InfiniRT backends with InfiniOps RmsNorm
+implementation 0 still require independent validation. Unsupported operations
+should fail clearly instead of silently falling back through CPU.
