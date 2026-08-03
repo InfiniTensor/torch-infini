@@ -168,6 +168,7 @@ setup(
                 "csrc/infini_ops.cpp",
                 "csrc/init.cpp",
                 "csrc/mm.cpp",
+                "csrc/mul.cpp",
                 "csrc/relu.cpp",
                 "csrc/rms_norm.cpp",
                 "csrc/runtime.cpp",

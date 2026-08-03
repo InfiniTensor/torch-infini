@@ -16,7 +16,7 @@ EXPECTED_NATIVE_COMMITS = {
     ),
     "INFINIOPS_COMMIT": (
         "InfiniOps",
-        "2cfb526080395a9ffeab319ad5c382e8260773d4",
+        "e0119e8613276b009990e21db8c5f11b0d0beea9",
     ),
 }
 

@@ -102,6 +102,7 @@ def test_infiniops_and_infinirt_paths_are_only_used_for_linking(monkeypatch, tmp
     ]
     assert extension["include_dirs"][-1] == str(REPO_ROOT / "csrc")
     assert "csrc/add.cpp" in extension["sources"]
+    assert "csrc/mul.cpp" in extension["sources"]
     assert "csrc/hooks.cpp" in extension["sources"]
     assert "csrc/host_allocator.cpp" in extension["sources"]
     assert "csrc/infini_ops.cpp" in extension["sources"]
