@@ -241,6 +241,8 @@ at::Tensor addmm(
 
 at::Tensor mm(const at::Tensor& self, const at::Tensor& mat2);
 
+at::Tensor mul(const at::Tensor& self, const at::Tensor& other);
+
 at::Tensor relu(const at::Tensor& self);
 
 at::Tensor rms_norm(
