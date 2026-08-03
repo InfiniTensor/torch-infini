@@ -22,9 +22,9 @@ torch.testing.assert_close(out, src + src)
 This first-step bridge is intentionally narrow. It wires PyTorch device and
 stream management, device and pinned-host allocation, synchronization,
 contiguous tensor copies, shared ATen tensor metadata adapters, and
-`aten::view`, `aten::add.Tensor`, `aten::mm`, `aten::addmm`, `aten::relu`, and
-`aten::rms_norm` to the Infini stack. General ATen operator coverage is left to
-later integration work.
+`aten::view`, `aten::add.Tensor`, `aten::mm`, `aten::addmm`, `aten::relu`,
+`aten::rms_norm`, and `aten::silu` to the Infini stack. General ATen operator
+coverage is left to later integration work.
 
 The implementation follows PyTorch's documented out-of-tree backend path:
 `PrivateUse1` is renamed to `infini`, C++ kernels are registered through the
@@ -43,7 +43,7 @@ cmake -S /path/to/InfiniOps -B /tmp/infini-ops-build \
   -DWITH_CPU=ON \
   -DWITH_TORCH=OFF \
   -DGENERATE_OPERATOR_CALL_INSTANTIATIONS=ON \
-  -DINFINI_OPS_OPS=add,gemm,relu,rms_norm
+  -DINFINI_OPS_OPS=add,gemm,relu,rms_norm,silu
 cmake --build /tmp/infini-ops-build --target infiniops -j
 cmake --install /tmp/infini-ops-build
 ```
@@ -85,7 +85,7 @@ CUDA; InfiniRT should eventually export any required transitive include paths.
 Source-build compatibility is tested for every combination of Python 3.10,
 3.11, and 3.12 with PyTorch 2.12 and 2.13. The tested native dependencies are
 InfiniRT commit `95c70080f9551e61241110497d163dfcdf9dc7e7` and InfiniOps commit
-`64f29847bb8a4445efe8d55759a035050c7d1bfa`.
+`2cfb526080395a9ffeab319ad5c382e8260773d4`.
 
 Binary wheel builds, editable builds, and in-place builds record the full
 PyTorch version, normalized major.minor version, and CXX11 ABI mode used to
@@ -177,6 +177,10 @@ The initial implementation supports:
 - `float32` `torch.nn.functional.rms_norm` and `nn.RMSNorm` inference through
   native InfiniOps implementation index 0 for contiguous two-dimensional and
   three-dimensional inputs with one normalized dimension and an affine weight
+- out-of-place `torch.nn.functional.silu` and `nn.SiLU` inference through
+  native InfiniOps implementation index 0 on CPU, NVIDIA, Iluvatar, MetaX, and
+  Moore, including supported floating-point dtypes and PyTorch-compatible output
+  layouts
 - end-to-end `float32` inference for two-layer `nn.Sequential` MLPs composed of
   `nn.Linear`, `nn.ReLU`, and `nn.Linear`, with matrix or contiguous
   `[batch, sequence, hidden]` inputs, on the ReLU-enabled runtime backends
@@ -215,4 +219,8 @@ support noncontiguous inputs, more than one normalized dimension, non-float32
 dtypes, missing affine weights, an out overload, or backward. Its CPU and NVIDIA
 paths are validated here; other InfiniRT backends with InfiniOps RmsNorm
 implementation 0 still require independent validation. Unsupported operations
-should fail clearly instead of silently falling back through CPU.
+should fail clearly instead of silently falling back through CPU. The initial
+SiLU path does not provide `silu_`, an out overload, or backward support.
+InfiniOps does not yet provide native SiLU implementation 0 for Cambricon,
+Ascend, or Hygon, so torch-infini reports those runtime backends as unsupported
+for this operator.

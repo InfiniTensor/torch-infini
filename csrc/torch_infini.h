@@ -249,6 +249,8 @@ at::Tensor rms_norm(
     const std::optional<at::Tensor>& weight,
     std::optional<double> eps);
 
+at::Tensor silu(const at::Tensor& self);
+
 } // namespace torch_infini
 
 #endif // TORCH_INFINI_TORCH_INFINI_H_

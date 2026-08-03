@@ -171,6 +171,7 @@ setup(
                 "csrc/relu.cpp",
                 "csrc/rms_norm.cpp",
                 "csrc/runtime.cpp",
+                "csrc/silu.cpp",
                 "csrc/stream.cpp",
                 "csrc/view.cpp",
             ],
