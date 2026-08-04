@@ -188,6 +188,11 @@ The initial implementation supports:
   `nn.Linear`, `nn.ReLU`, and `nn.Linear`, with matrix or contiguous
   `[batch, sequence, hidden]` inputs, on the ReLU-enabled runtime backends
   listed above
+- end-to-end `float32` inference for gated MLP blocks composed of parallel,
+  bias-free `nn.Linear` gate and up projections, `torch.nn.functional.silu`,
+  tensor multiplication, and a bias-free `nn.Linear` down projection, with
+  contiguous `[batch, sequence, hidden]` inputs, validated on the InfiniRT CPU
+  and NVIDIA backends
 
 The `torch.infini` module follows `torch.cuda` naming and semantics for the
 device and stream-management operations it implements. Stream priorities,
