@@ -115,6 +115,7 @@ at::Tensor mm(const at::Tensor& self, const at::Tensor& mat2) {
             context.config,
             self_view,
             mat2_view,
+            std::optional<infini::ops::Tensor>{},
             std::optional<float>{1.0F},
             std::optional<float>{0.0F},
             std::optional<int>{0},
