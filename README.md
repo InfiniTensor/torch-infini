@@ -85,7 +85,7 @@ CUDA; InfiniRT should eventually export any required transitive include paths.
 Source-build compatibility is tested for every combination of Python 3.10,
 3.11, and 3.12 with PyTorch 2.12 and 2.13. The tested native dependencies are
 InfiniRT commit `95c70080f9551e61241110497d163dfcdf9dc7e7` and InfiniOps commit
-`e0119e8613276b009990e21db8c5f11b0d0beea9`.
+`6c66469dcc5cb229a02dcfa348f8c32ef8155b96`.
 
 Binary wheel builds, editable builds, and in-place builds record the full
 PyTorch version, normalized major.minor version, and CXX11 ABI mode used to
