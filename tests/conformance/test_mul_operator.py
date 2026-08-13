@@ -299,11 +299,85 @@ def test_mul_unsupported_backend_reports_native_gap() -> None:
         torch.mul(lhs, rhs)
 
 
-def test_mul_scalar_argument_is_not_implemented() -> None:
-    lhs, _ = _typed_inputs("infini", dtype=torch.float32)
+@pytest.mark.parametrize(
+    ("dtype", "scalar", "rtol", "atol"),
+    [
+        pytest.param(torch.float32, 0.5, 1e-6, 1e-6, id="float32-float"),
+        pytest.param(torch.float16, 2, 1e-3, 1e-3, id="float16-int"),
+        pytest.param(torch.bfloat16, True, 1e-2, 1e-2, id="bfloat16-bool"),
+        pytest.param(torch.int32, 2, 0, 0, id="int32-int"),
+    ],
+)
+def test_mul_python_scalar_matches_cpu(
+    dtype: torch.dtype,
+    scalar: float | int | bool,
+    rtol: float,
+    atol: float,
+    native_mul_backend: str,
+) -> None:
+    source = torch.tensor((-4, -2, -1, 0, 1, 3), dtype=dtype)
+    expected = torch.mul(source, scalar)
+    input_tensor = copy_cpu_tensor(source, "infini")
 
-    with pytest.raises(RuntimeError, match="expects two infini tensors"):
-        torch.mul(lhs, 2.0)
+    result = torch.mul(input_tensor, scalar)
+    actual = torch.empty_like(expected)
+    actual.copy_(result)
+
+    assert native_mul_backend in NATIVE_MUL_BACKENDS
+    assert result.dtype == expected.dtype
+    torch.testing.assert_close(actual, expected, rtol=rtol, atol=atol)
+
+
+def test_mul_reverse_python_scalar_matches_cpu(native_mul_backend: str) -> None:
+    source = torch.linspace(-2.0, 2.0, steps=6, dtype=torch.float32)
+    expected = 0.5 * source
+    input_tensor = copy_cpu_tensor(source, "infini")
+
+    result = 0.5 * input_tensor
+    actual = torch.empty_like(expected)
+    actual.copy_(result)
+
+    assert native_mul_backend in NATIVE_MUL_BACKENDS
+    torch.testing.assert_close(actual, expected)
+
+
+def test_mul_scalar_empty_tensor_matches_cpu(native_mul_backend: str) -> None:
+    input_tensor = torch.empty((0, 3), dtype=torch.float32, device="infini")
+
+    result = input_tensor * 0.5
+
+    assert native_mul_backend in NATIVE_MUL_BACKENDS
+    assert result.device.type == "infini"
+    assert result.shape == input_tensor.shape
+    assert result.dtype == input_tensor.dtype
+
+
+def test_mul_scalar_type_promotion_is_not_implemented() -> None:
+    source = torch.arange(6, dtype=torch.int32)
+    input_tensor = copy_cpu_tensor(source, "infini")
+
+    with pytest.raises(RuntimeError, match="does not support type promotion"):
+        torch.mul(input_tensor, 0.5)
+
+
+def test_mul_scalar_records_storage_on_current_stream(
+    native_mul_backend: str,
+    infini_ops_test_module,
+) -> None:
+    source = torch.linspace(-2.0, 2.0, steps=6, dtype=torch.float32)
+    input_tensor = copy_cpu_tensor(source, "infini")
+    stream = torch.infini.Stream()
+
+    with torch.infini.stream(stream):
+        result = input_tensor * 0.5
+        recorded = [
+            infini_ops_test_module.allocation_records_current_stream(tensor)
+            for tensor in (input_tensor, result)
+        ]
+
+    assert native_mul_backend in NATIVE_MUL_BACKENDS
+    assert recorded == [True, True]
+    stream.synchronize()
 
 
 def test_mul_out_overload_is_not_implemented() -> None:
@@ -321,9 +395,10 @@ def test_mul_inplace_overload_is_not_implemented() -> None:
         lhs.mul_(rhs)
 
 
-def test_mul_rejects_cpu_other() -> None:
+@pytest.mark.parametrize("shape", [(6,), ()], ids=["vector", "scalar"])
+def test_mul_rejects_cpu_other(shape: tuple[int, ...]) -> None:
     lhs, _ = _typed_inputs("infini", dtype=torch.float32)
-    _, rhs = _typed_inputs("cpu", dtype=torch.float32)
+    rhs = torch.full(shape, 2.0, dtype=torch.float32)
 
     with pytest.raises(RuntimeError, match="expects two infini tensors"):
         torch.mul(lhs, rhs)
