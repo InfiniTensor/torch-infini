@@ -166,9 +166,10 @@ The initial implementation supports:
 - internal ATen-to-InfiniRT TensorView and InfiniOps execution-context adapters
 - same-dtype, same-device `torch.add(tensor, tensor)` through native InfiniOps
   implementation index 0, including broadcasted and strided inputs
-- same-dtype, same-device `torch.mul(tensor, tensor)` through native InfiniOps
-  implementation index 0 on CPU, NVIDIA, Iluvatar, MetaX, Moore, and Ascend,
-  including broadcasted and strided inputs
+- same-dtype, same-device `torch.mul(tensor, tensor)` and dtype-preserving
+  multiplication by Python scalars through native InfiniOps implementation
+  index 0 on CPU, NVIDIA, Iluvatar, MetaX, Moore, and Ascend, including
+  broadcasted and strided tensor inputs
 - `float32` `torch.mm`, `torch.bmm`, and `torch.addmm` inference through native
   InfiniOps implementation index 0, plus `nn.Linear` inference for matrix
   inputs and contiguous `[batch, sequence, hidden]` inputs, including
@@ -211,8 +212,9 @@ events, so those event constructor options raise `NotImplementedError`. Event
 operations are validated with the InfiniRT CPU and NVIDIA backends; other
 backends require corresponding InfiniRT event support. The initial tensor Add
 path requires `alpha == 1` and does not perform dtype promotion. The initial
-tensor Mul path does not provide scalar, out, or in-place overloads, dtype
-promotion, or backward support. The initial
+tensor Mul path accepts Python scalars when the result keeps the tensor dtype.
+It does not provide out or in-place overloads, dtype promotion, or backward
+support. The initial
 matrix multiplication paths are limited to `float32` non-overlapping dense
 inputs: two-dimensional inputs for `mm` and three-dimensional inputs with
 matching batch dimensions for `bmm`. PyTorch's composite `nn.Linear` path uses
