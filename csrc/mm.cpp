@@ -55,6 +55,55 @@ void check_mm_inputs(const at::Tensor& self, const at::Tensor& mat2) {
       "aten::mm currently only supports non-overlapping dense inputs");
 }
 
+void check_bmm_inputs(const at::Tensor& self, const at::Tensor& mat2) {
+  TORCH_CHECK(
+      self.device().type() == kDeviceType &&
+          mat2.device().type() == kDeviceType,
+      "aten::bmm expects two infini tensors, got ",
+      self.device(),
+      " and ",
+      mat2.device());
+  TORCH_CHECK(
+      self.device() == mat2.device(),
+      "aten::bmm requires tensors on the same infini device, got ",
+      self.device(),
+      " and ",
+      mat2.device());
+  TORCH_CHECK(
+      self.scalar_type() == mat2.scalar_type(),
+      "aten::bmm requires matching dtypes, got ",
+      self.scalar_type(),
+      " and ",
+      mat2.scalar_type());
+  TORCH_CHECK(
+      self.scalar_type() == c10::ScalarType::Float,
+      "aten::bmm currently only supports torch.float32, got ",
+      self.scalar_type());
+  TORCH_CHECK(
+      self.dim() == 3 && mat2.dim() == 3,
+      "aten::bmm expects 3D tensors, got ",
+      self.dim(),
+      "D and ",
+      mat2.dim(),
+      "D tensors");
+  TORCH_CHECK(
+      self.size(0) == mat2.size(0),
+      "aten::bmm requires matching batch dimensions, got ",
+      self.sizes(),
+      " and ",
+      mat2.sizes());
+  TORCH_CHECK(
+      self.size(2) == mat2.size(1),
+      "aten::bmm requires matching inner dimensions, got ",
+      self.sizes(),
+      " and ",
+      mat2.sizes());
+  TORCH_CHECK(
+      self.is_non_overlapping_and_dense() &&
+          mat2.is_non_overlapping_and_dense(),
+      "aten::bmm currently only supports non-overlapping dense inputs");
+}
+
 void check_native_gemm_support(infini::rt::Device::Type device_type) {
   using DeviceType = infini::rt::Device::Type;
 
@@ -75,7 +124,7 @@ void check_native_gemm_support(infini::rt::Device::Type device_type) {
   }
 }
 
-void zero_mm_output(const at::Tensor& output, const c10::Stream& stream) {
+void zero_gemm_output(const at::Tensor& output, const c10::Stream& stream) {
   const auto nbytes = static_cast<std::size_t>(output.numel()) *
       static_cast<std::size_t>(output.element_size());
   run_synchronous_stream_work(stream, [&] {
@@ -84,6 +133,47 @@ void zero_mm_output(const at::Tensor& output, const c10::Stream& stream) {
 }
 
 } // namespace
+
+at::Tensor bmm(const at::Tensor& self, const at::Tensor& mat2) {
+  check_bmm_inputs(self, mat2);
+  const c10::DeviceGuard guard{self.device()};
+
+  const auto runtime_device = infini_ops::to_device(self.device());
+  check_native_gemm_support(runtime_device.type());
+  (void)infini_ops::to_data_type(self.scalar_type());
+
+  auto output =
+      at::empty({self.size(0), self.size(1), mat2.size(2)}, self.options());
+  if (output.numel() == 0) {
+    return output;
+  }
+
+  const auto stream = get_current_stream(self.device());
+  if (self.size(2) == 0) {
+    zero_gemm_output(output, stream);
+    return output;
+  }
+
+  const auto self_view = infini_ops::to_tensor_view(self);
+  const auto mat2_view = infini_ops::to_tensor_view(mat2);
+  const auto output_view = infini_ops::to_tensor_view(output);
+  submit_stream_work(
+      stream, {self, mat2, output}, [&](rt::Stream native_stream) {
+        const auto context = infini_ops::make_execution_context(native_stream);
+        infini::ops::Gemm::Call(
+            context.handle,
+            context.config,
+            self_view,
+            mat2_view,
+            std::optional<infini::ops::Tensor>{},
+            std::optional<float>{1.0F},
+            std::optional<float>{0.0F},
+            std::optional<int>{0},
+            std::optional<int>{0},
+            output_view);
+      });
+  return output;
+}
 
 at::Tensor mm(const at::Tensor& self, const at::Tensor& mat2) {
   check_mm_inputs(self, mat2);
@@ -100,7 +190,7 @@ at::Tensor mm(const at::Tensor& self, const at::Tensor& mat2) {
 
   const auto stream = get_current_stream(self.device());
   if (self.size(1) == 0) {
-    zero_mm_output(output, stream);
+    zero_gemm_output(output, stream);
     return output;
   }
 
@@ -126,6 +216,7 @@ at::Tensor mm(const at::Tensor& self, const at::Tensor& mat2) {
 }
 
 TORCH_LIBRARY_IMPL(aten, PrivateUse1, m) {
+  m.impl("bmm", TORCH_FN(bmm));
   m.impl("mm", TORCH_FN(mm));
 }
 
